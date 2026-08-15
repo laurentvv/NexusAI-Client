@@ -55,6 +55,7 @@ class CohereProvider(BaseAIProvider):
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
+            default_vision_model=config.default_vision_model,
             timeout=config.timeout,
             **kwargs,
         )
@@ -94,6 +95,90 @@ class CohereProvider(BaseAIProvider):
             json_mode=json_mode,
             **kwargs,
         )
+
+    @override
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image or document using Cohere multimodal models (e.g. Aya Vision)."""
+        from nexusai_client.utils import load_image_as_data_uri
+
+        target_model = model or self.default_vision_model or "c4ai-aya-vision-32b"
+        data_uri = load_image_as_data_uri(image)
+
+        user_content: list[dict[str, Any]] = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_uri}},
+        ]
+
+        messages_payload: list[dict[str, Any]] = []
+        if system_prompt:
+            messages_payload.append({"role": "system", "content": system_prompt})
+        messages_payload.append({"role": "user", "content": user_content})
+
+        payload: dict[str, Any] = {
+            "model": target_model,
+            "messages": messages_payload,
+            "temperature": temperature,
+            **kwargs,
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        client = await self.get_client()
+        url = f"{self.base_url}/chat"
+
+        try:
+            response = await client.post(url, json=payload, headers=self._get_headers())
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+        except (httpx.NetworkError, httpx.ConnectError) as exc:
+            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+
+        self._handle_http_error(response)
+
+        try:
+            data = response.json()
+            content_list = data.get("message", {}).get("content", [])
+            text_parts = [c.get("text", "") for c in content_list if c.get("type") == "text" or "text" in c]
+            reply_text = "".join(text_parts) if text_parts else str(data.get("message", {}).get("content", ""))
+
+            usage_data = data.get("usage", {}).get("tokens", {})
+            prompt_tokens = usage_data.get("input_tokens")
+            completion_tokens = usage_data.get("output_tokens")
+            total_tokens = (prompt_tokens or 0) + (completion_tokens or 0) if prompt_tokens is not None else None
+
+            usage = UsageInfo(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            ) if total_tokens is not None else None
+
+            return AIResponse(
+                text=reply_text,
+                provider=self.provider_name,
+                model=target_model,
+                usage=usage,
+                raw_response=data,
+            )
+        except Exception as exc:
+            raise APIResponseError(
+                provider=self.provider_name,
+                status_code=response.status_code,
+                response_body=response.text,
+                message=f"Failed to parse Cohere Vision response: {exc}",
+            ) from exc
 
     @override
     async def chat(

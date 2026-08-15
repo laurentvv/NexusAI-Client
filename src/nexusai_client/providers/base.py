@@ -39,6 +39,7 @@ class BaseAIProvider(ABC):
         api_key: str,
         base_url: str,
         default_model: str,
+        default_vision_model: str | None = None,
         timeout: float = 60.0,
         extra_headers: dict[str, str] | None = None,
         **kwargs: Any,
@@ -47,10 +48,11 @@ class BaseAIProvider(ABC):
         self.api_key: str = api_key
         self.base_url: str = base_url.rstrip("/")
         self.default_model: str = default_model
+        self.default_vision_model: str | None = default_vision_model
         self.timeout: float = timeout
         self.extra_headers: dict[str, str] = extra_headers or {}
         self.extra_params: dict[str, Any] = {
-            k: v for k, v in kwargs.items() if v is not None and k not in ("model", "default_model")
+            k: v for k, v in kwargs.items() if v is not None and k not in ("model", "default_model", "vision_model")
         }
         self._client: httpx.AsyncClient | None = None
 
@@ -73,6 +75,22 @@ class BaseAIProvider(ABC):
         **kwargs: Any,
     ) -> AIResponse:
         """Generate a single text response from a prompt."""
+        ...
+
+    @abstractmethod
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image, chart, PDF or screenshot using multimodal models."""
         ...
 
     @abstractmethod

@@ -68,6 +68,13 @@ class ProviderDefaults:
     COHERE_MODEL: Final[str] = "command-r-plus-08-2024"
     COHERE_ENV_KEY: Final[str] = "COHERE_API_KEY"
 
+    # Default Vision Models for Multimodal Analysis
+    GEMINI_VISION_MODEL: Final[str] = "gemini-2.5-flash"
+    NVIDIA_VISION_MODEL: Final[str] = "meta/llama-3.2-11b-vision-instruct"
+    MISTRAL_VISION_MODEL: Final[str] = "pixtral-12b-2409"
+    COHERE_VISION_MODEL: Final[str] = "c4ai-aya-vision-32b"
+    OPENROUTER_VISION_MODEL: Final[str] = "google/gemini-2.0-flash-exp:free"
+
     # Global
     DEFAULT_TIMEOUT: Final[float] = 60.0
 
@@ -78,9 +85,11 @@ class _ProviderMeta:
     env_key: str
     default_base_url: str
     default_model: str
+    default_vision_model: str | None = None
     fallback_env_key: str | None = None
     env_base_url_var: str | None = None
     env_model_var: str | None = None
+    env_vision_model_var: str | None = None
 
 
 _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
@@ -99,6 +108,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.GEMINI_PRO_ENV_KEY,
         default_base_url=ProviderDefaults.GEMINI_PRO_BASE_URL,
         default_model=ProviderDefaults.GEMINI_PRO_MODEL,
+        default_vision_model=ProviderDefaults.GEMINI_VISION_MODEL,
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_PRO_BASE_URL",
         env_model_var="GEMINI_PRO_DEFAULT_MODEL",
@@ -109,6 +119,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.GEMINI_FREE_ENV_KEY,
         default_base_url=ProviderDefaults.GEMINI_FREE_BASE_URL,
         default_model=ProviderDefaults.GEMINI_FREE_MODEL,
+        default_vision_model=ProviderDefaults.GEMINI_VISION_MODEL,
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_FREE_BASE_URL",
         env_model_var="GEMINI_FREE_DEFAULT_MODEL",
@@ -118,6 +129,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.GEMINI_FREE_ENV_KEY,
         default_base_url=ProviderDefaults.GEMINI_FREE_BASE_URL,
         default_model=ProviderDefaults.GEMINI_FREE_MODEL,
+        default_vision_model=ProviderDefaults.GEMINI_VISION_MODEL,
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_FREE_BASE_URL",
         env_model_var="GEMINI_FREE_DEFAULT_MODEL",
@@ -128,6 +140,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.MISTRAL_ENV_KEY,
         default_base_url=ProviderDefaults.MISTRAL_BASE_URL,
         default_model=ProviderDefaults.MISTRAL_MODEL,
+        default_vision_model=ProviderDefaults.MISTRAL_VISION_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
     ),
@@ -136,6 +149,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.MISTRAL_ENV_KEY,
         default_base_url=ProviderDefaults.MISTRAL_BASE_URL,
         default_model=ProviderDefaults.MISTRAL_MODEL,
+        default_vision_model=ProviderDefaults.MISTRAL_VISION_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
     ),
@@ -162,6 +176,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.COHERE_ENV_KEY,
         default_base_url=ProviderDefaults.COHERE_BASE_URL,
         default_model=ProviderDefaults.COHERE_MODEL,
+        default_vision_model=ProviderDefaults.COHERE_VISION_MODEL,
         env_base_url_var="COHERE_BASE_URL",
         env_model_var="COHERE_DEFAULT_MODEL",
     ),
@@ -170,6 +185,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.COHERE_ENV_KEY,
         default_base_url=ProviderDefaults.COHERE_BASE_URL,
         default_model=ProviderDefaults.COHERE_MODEL,
+        default_vision_model=ProviderDefaults.COHERE_VISION_MODEL,
         env_base_url_var="COHERE_BASE_URL",
         env_model_var="COHERE_DEFAULT_MODEL",
     ),
@@ -196,6 +212,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.NVIDIA_ENV_KEY,
         default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
         default_model=ProviderDefaults.NVIDIA_MODEL,
+        default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
     ),
@@ -204,6 +221,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.NVIDIA_ENV_KEY,
         default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
         default_model=ProviderDefaults.NVIDIA_MODEL,
+        default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
     ),
@@ -212,6 +230,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.NVIDIA_ENV_KEY,
         default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
         default_model=ProviderDefaults.NVIDIA_MODEL,
+        default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
     ),
@@ -221,6 +240,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.OPENROUTER_ENV_KEY,
         default_base_url=ProviderDefaults.OPENROUTER_BASE_URL,
         default_model=ProviderDefaults.OPENROUTER_MODEL,
+        default_vision_model=ProviderDefaults.OPENROUTER_VISION_MODEL,
         env_base_url_var="OPENROUTER_BASE_URL",
         env_model_var="OPENROUTER_DEFAULT_MODEL",
     ),
@@ -229,6 +249,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.OPENROUTER_ENV_KEY,
         default_base_url=ProviderDefaults.OPENROUTER_BASE_URL,
         default_model=ProviderDefaults.OPENROUTER_MODEL,
+        default_vision_model=ProviderDefaults.OPENROUTER_VISION_MODEL,
         env_base_url_var="OPENROUTER_BASE_URL",
         env_model_var="OPENROUTER_DEFAULT_MODEL",
     ),
@@ -242,6 +263,7 @@ class ProviderConfig:
     api_key: str
     base_url: str
     default_model: str
+    default_vision_model: str | None = None
     timeout: float = 60.0
     extra_headers: dict[str, str] | None = None
 
@@ -317,6 +339,7 @@ class Config:
             api_key=resolved_key,
             base_url=base_url or env_base or meta.default_base_url,
             default_model=model or env_model or meta.default_model,
+            default_vision_model=meta.default_vision_model,
             timeout=resolved_timeout,
             extra_headers=extra_headers,
         )

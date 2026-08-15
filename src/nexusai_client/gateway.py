@@ -156,6 +156,38 @@ class FallbackGateway(BaseAIProvider):
 
         raise RuntimeError(f"All providers in FallbackGateway chain failed. Last error: {last_error}")
 
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Attempt multimodal vision analysis across providers in chain order."""
+        last_error: Exception | None = None
+        for prov in self._provider_chain:
+            try:
+                return await prov.analyze_image(
+                    prompt=prompt,
+                    image=image,
+                    system_prompt=system_prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    **kwargs,
+                )
+            except (NexusAIError, Exception) as err:
+                logger.warning(f"FallbackGateway Vision: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                last_error = err
+
+        raise RuntimeError(f"All vision providers in FallbackGateway chain failed. Last error: {last_error}")
+
     async def chat(
         self,
         messages: list[ChatMessage | dict[str, str]],
@@ -390,6 +422,67 @@ class AIGateway:
         return configured_paid + configured_free
 
     @classmethod
+    def get_configured_vision_providers(cls, *, prioritize_free: bool = True) -> list[str]:
+        """Inspect environment and return active providers that support multimodal vision analysis."""
+        free_vision_candidates = [
+            "gemini_free",
+            "nvidia_free",
+            "cohere_free",
+            "mistral",
+            "openrouter",
+        ]
+        paid_vision_candidates = ["gemini_pro"]
+
+        configured_free: list[str] = []
+        configured_paid: list[str] = []
+
+        for p_name in free_vision_candidates:
+            try:
+                prov = cls.create(p_name)
+                if prov.api_key:
+                    configured_free.append(p_name)
+            except (MissingAPIKeyError, Exception):
+                pass
+
+        for p_name in paid_vision_candidates:
+            try:
+                prov = cls.create(p_name)
+                if prov.api_key:
+                    configured_paid.append(p_name)
+            except (MissingAPIKeyError, Exception):
+                pass
+
+        if prioritize_free:
+            return configured_free + configured_paid
+        return configured_paid + configured_free
+
+    @classmethod
+    def auto_fallback_vision(
+        cls,
+        *,
+        prioritize_free: bool = True,
+        timeout: float = 60.0,
+        **kwargs: Any,
+    ) -> FallbackGateway:
+        """Automatically create a FallbackGateway composed of active multimodal Vision providers.
+
+        Example:
+        -------
+        ```python
+        async with AIGateway.auto_fallback_vision() as client:
+            res = await client.analyze_image("Extract table data to JSON", "invoice.png")
+        ```
+        """
+        chain = cls.get_configured_vision_providers(prioritize_free=prioritize_free)
+        if not chain:
+            raise MissingAPIKeyError(
+                provider="Any Vision Provider",
+                env_var="GEMINI_FREE_API_KEY, NVIDIA_API_KEY, COHERE_API_KEY, MISTRAL_API_KEY, or OPENROUTER_API_KEY",
+                message="No configured multimodal Vision providers found in .env.",
+            )
+        return cls.with_fallback(chain, timeout=timeout, **kwargs)
+
+    @classmethod
     def auto_fallback(
         cls,
         *,
@@ -525,6 +618,30 @@ class AIGateway:
         """Generate text using the underlying configured provider."""
         return await self.provider.generate_text(
             prompt=prompt,
+            system_prompt=system_prompt,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+            **kwargs,
+        )
+
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image, chart, PDF, or screenshot using multimodal vision models."""
+        return await self.provider.analyze_image(
+            prompt=prompt,
+            image=image,
             system_prompt=system_prompt,
             model=model,
             temperature=temperature,

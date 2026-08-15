@@ -102,6 +102,97 @@ class GeminiBaseProvider(BaseAIProvider):
         )
 
     @override
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image, chart, PDF, or screenshot with Google Gemini Vision."""
+        from nexusai_client.utils import load_image_as_base64_and_mime
+
+        target_model = model or self.default_vision_model or self.default_model
+        b64_str, mime_type = load_image_as_base64_and_mime(image)
+
+        parts: list[dict[str, Any]] = [
+            {"text": prompt},
+            {
+                "inline_data": {
+                    "mime_type": mime_type,
+                    "data": b64_str,
+                }
+            },
+        ]
+
+        contents = [{"role": "user", "parts": parts}]
+        payload: dict[str, Any] = {"contents": contents}
+
+        if system_prompt:
+            payload["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+        gen_config: dict[str, Any] = {"temperature": temperature}
+        if max_tokens is not None:
+            gen_config["maxOutputTokens"] = max_tokens
+        if json_mode:
+            gen_config["responseMimeType"] = "application/json"
+
+        payload["generationConfig"] = gen_config
+        payload.update(self.extra_params)
+        payload.update(kwargs)
+
+        url = f"{self.base_url}/models/{target_model}:generateContent?key={self.api_key}"
+        client = await self.get_client()
+
+        try:
+            response = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+        except (httpx.NetworkError, httpx.ConnectError) as exc:
+            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+
+        self._handle_http_error(response)
+
+        try:
+            data = response.json()
+            candidates = data.get("candidates", [])
+            reply_text = ""
+            if candidates:
+                cand_parts = candidates[0].get("content", {}).get("parts", [])
+                reply_text = "".join(p.get("text", "") for p in cand_parts)
+
+            usage_meta = data.get("usageMetadata", {})
+            prompt_tokens = usage_meta.get("promptTokenCount")
+            completion_tokens = usage_meta.get("candidatesTokenCount")
+            total_tokens = usage_meta.get("totalTokenCount")
+
+            usage = UsageInfo(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            ) if total_tokens is not None else None
+
+            return AIResponse(
+                text=reply_text,
+                provider=self.provider_name,
+                model=target_model,
+                usage=usage,
+                raw_response=data,
+            )
+        except Exception as exc:
+            raise APIResponseError(
+                provider=self.provider_name,
+                status_code=response.status_code,
+                response_body=response.text,
+                message=f"Failed to parse Gemini Vision response: {exc}",
+            ) from exc
+
+    @override
     async def chat(
         self,
         messages: list[ChatMessage | dict[str, str]],
@@ -362,6 +453,7 @@ class GeminiProProvider(GeminiBaseProvider):
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
+            default_vision_model=config.default_vision_model,
             timeout=config.timeout,
             **kwargs,
         )
@@ -415,6 +507,7 @@ class GeminiFreeProvider(GeminiBaseProvider):
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
+            default_vision_model=config.default_vision_model,
             timeout=config.timeout,
             **kwargs,
         )

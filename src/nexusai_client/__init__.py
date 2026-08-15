@@ -53,6 +53,10 @@ from nexusai_client.providers import (
     OpenAICompatibleProvider,
     OpenRouterProvider,
 )
+from nexusai_client.utils import (
+    load_image_as_base64_and_mime,
+    load_image_as_data_uri,
+)
 
 __version__ = "0.1.0"
 
@@ -87,6 +91,9 @@ __all__ = [
     "Config",
     "ProviderConfig",
     "ProviderDefaults",
+    # Image & Multimodal Utilities
+    "load_image_as_base64_and_mime",
+    "load_image_as_data_uri",
     # Exceptions
     "NexusAIError",
     "ConfigurationError",

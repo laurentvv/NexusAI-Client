@@ -568,3 +568,83 @@ async def test_timeout_error_handling() -> None:
             with pytest.raises(APITimeoutError) as exc_info:
                 await client.generate_text("Test prompt")
             assert exc_info.value.timeout_seconds == 5.0
+
+
+def test_utils_image_encoding() -> None:
+    """Test image loading from raw bytes and data URI formatting."""
+    from nexusai_client.utils import load_image_as_base64_and_mime, load_image_as_data_uri
+
+    # Synthetic 1x1 PNG bytes
+    png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+    b64, mime = load_image_as_base64_and_mime(png_bytes)
+    assert mime == "image/png"
+    assert len(b64) > 0
+
+    data_uri = load_image_as_data_uri(png_bytes)
+    assert data_uri.startswith("data:image/png;base64,")
+
+
+@pytest.mark.asyncio
+async def test_analyze_image_gemini_mocked() -> None:
+    """Test Gemini Vision analyze_image request and response parsing."""
+    mock_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"text": "A futuristic glowing banner."}],
+                    "role": "model",
+                },
+                "finishReason": "STOP",
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 50,
+            "candidatesTokenCount": 8,
+            "totalTokenCount": 58,
+        },
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"),
+    )
+
+    async with AIGateway("gemini_free", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+            png_bytes = b"\x89PNG\r\n\x1a\n"
+            res = await client.analyze_image("Describe this image", png_bytes)
+            assert res.text == "A futuristic glowing banner."
+            assert res.provider == "gemini_free"
+            assert res.model == "gemini-2.5-flash"
+            assert res.usage is not None
+            assert res.usage.total_tokens == 58
+
+
+@pytest.mark.asyncio
+async def test_analyze_image_openai_compat_mocked() -> None:
+    """Test OpenAI-compatible / Nvidia / Mistral Vision analyze_image."""
+    mock_payload = {
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": "Visual description of the chart."},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"prompt_tokens": 60, "completion_tokens": 10, "total_tokens": 70},
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://integrate.api.nvidia.com/v1/chat/completions"),
+    )
+
+    async with AIGateway("nvidia_free", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+            png_bytes = b"\x89PNG\r\n\x1a\n"
+            res = await client.analyze_image("Explain the chart", png_bytes)
+            assert res.text == "Visual description of the chart."
+            assert res.provider == "nvidia"
+            assert res.model == "meta/llama-3.2-11b-vision-instruct"
+

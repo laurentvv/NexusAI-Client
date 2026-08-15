@@ -231,6 +231,29 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### 6. Multimodal Vision Analysis (Images, Charts, PDFs)
+
+Pass a local file path (`Path` or `str`), raw `bytes`, or web URL:
+
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # Automatically selects the best Vision model (Gemini 2.5 Flash, Llama 3.2 Vision, Aya Vision, Pixtral)
+    async with AIGateway.auto_fallback_vision() as client:
+        res = await client.analyze_image(
+            prompt="Extract the invoice total and line items formatted as JSON.",
+            image="invoice.png", # or "https://example.com/chart.jpg" or raw bytes
+            json_mode=True,
+        )
+        print(f"[{res.provider} / {res.model}]:")
+        print(res.text)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 👉 **[Read the Full Integration Guide (FastAPI, Background Workers, Chat Sessions)](./INTEGRATION_GUIDE.md)**
 
 ---

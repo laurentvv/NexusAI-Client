@@ -77,6 +77,95 @@ class OpenAICompatibleProvider(BaseAIProvider):
         )
 
     @override
+    async def analyze_image(
+        self,
+        prompt: str,
+        image: Any,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image, chart, PDF, or screenshot via OpenAI-compatible vision payload."""
+        from nexusai_client.utils import load_image_as_data_uri
+
+        target_model = model or self.default_vision_model or self.default_model
+        data_uri = load_image_as_data_uri(image)
+
+        user_content: list[dict[str, Any]] = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_uri}},
+        ]
+
+        messages_payload: list[dict[str, Any]] = []
+        if system_prompt:
+            messages_payload.append({"role": "system", "content": system_prompt})
+        messages_payload.append({"role": "user", "content": user_content})
+
+        payload: dict[str, Any] = {
+            "model": target_model,
+            "messages": messages_payload,
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        payload.update(self.extra_params)
+        payload.update(kwargs)
+
+        headers = self._build_headers()
+        client = await self.get_client()
+
+        try:
+            response = await client.post(
+                self.chat_endpoint,
+                headers=headers,
+                json=payload,
+            )
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+        except (httpx.NetworkError, httpx.ConnectError) as exc:
+            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+
+        self._handle_http_error(response)
+
+        try:
+            data = response.json()
+            choice = data["choices"][0]
+            reply_text = choice["message"].get("content") or ""
+
+            usage_data = data.get("usage", {})
+            prompt_tokens = usage_data.get("prompt_tokens")
+            completion_tokens = usage_data.get("completion_tokens")
+            total_tokens = usage_data.get("total_tokens")
+
+            usage = UsageInfo(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            ) if total_tokens is not None else None
+
+            return AIResponse(
+                text=reply_text,
+                provider=self.provider_name,
+                model=target_model,
+                usage=usage,
+                raw_response=data,
+            )
+        except Exception as exc:
+            raise APIResponseError(
+                provider=self.provider_name,
+                status_code=response.status_code,
+                response_body=response.text,
+                message=f"Failed to parse Vision response: {exc}",
+            ) from exc
+
+    @override
     async def chat(
         self,
         messages: list[ChatMessage | dict[str, str]],

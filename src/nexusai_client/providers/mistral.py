@@ -83,6 +83,7 @@ class MistralProvider(OpenAICompatibleProvider):
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
+            default_vision_model=config.default_vision_model,
             timeout=config.timeout,
             **kwargs,
         )
