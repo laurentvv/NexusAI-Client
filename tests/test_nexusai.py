@@ -1,0 +1,395 @@
+"""Comprehensive unit test suite for NexusAI-Client."""
+
+from __future__ import annotations
+
+import os
+from unittest.mock import AsyncMock, patch
+
+import httpx
+import pytest
+
+from nexusai_client import (
+    AccountInfo,
+    AIGateway,
+    AIResponse,
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    BaseAIProvider,
+    ChatMessage,
+    Config,
+    DeepSeekProvider,
+    GeminiFreeProvider,
+    GeminiProProvider,
+    MissingAPIKeyError,
+    MistralProvider,
+    ModelInfo,
+    NvidiaProvider,
+    OpenRouterProvider,
+    ProviderNotFoundError,
+    ProviderType,
+    RateLimitError,
+)
+
+
+def test_missing_api_key_raises() -> None:
+    """Test that creating a provider without API key raises MissingAPIKeyError."""
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(MissingAPIKeyError) as exc_info:
+            AIGateway(provider="deepseek")
+        assert exc_info.value.provider == "DeepSeek"
+        assert exc_info.value.env_var == "DEEPSEEK_API_KEY"
+
+
+def test_invalid_provider_raises() -> None:
+    """Test that requesting an unknown provider raises ProviderNotFoundError."""
+    with pytest.raises(ProviderNotFoundError) as exc_info:
+        AIGateway(provider="unknown_provider_xyz")
+    assert "unknown_provider_xyz" in str(exc_info.value)
+    assert len(exc_info.value.available_providers) > 0
+
+
+def test_instantiate_with_direct_key() -> None:
+    """Test instantiating all 6 providers with explicit API keys."""
+    # 1. DeepSeek
+    client_ds = AIGateway(provider="deepseek", api_key="sk-test-deepseek")
+    assert isinstance(client_ds.provider, DeepSeekProvider)
+    assert client_ds.provider.api_key == "sk-test-deepseek"
+
+    # 2. Gemini Pro
+    client_gp = AIGateway(provider="gemini_pro", api_key="test-gemini-pro")
+    assert isinstance(client_gp.provider, GeminiProProvider)
+    assert client_gp.provider.api_key == "test-gemini-pro"
+
+    # 3. Gemini Free
+    client_gf = AIGateway(provider="gemini_free", api_key="test-gemini-free")
+    assert isinstance(client_gf.provider, GeminiFreeProvider)
+    assert client_gf.provider.api_key == "test-gemini-free"
+
+    # 4. Mistral
+    client_m = AIGateway(provider="mistral", api_key="test-mistral")
+    assert isinstance(client_m.provider, MistralProvider)
+    assert client_m.provider.api_key == "test-mistral"
+
+    # 5. Nvidia
+    client_nv = AIGateway(provider="nvidia_free", api_key="test-nvidia")
+    assert isinstance(client_nv.provider, NvidiaProvider)
+    assert client_nv.provider.api_key == "test-nvidia"
+
+    # 6. OpenRouter
+    client_or = AIGateway(provider="openrouter", api_key="test-openrouter")
+    assert isinstance(client_or.provider, OpenRouterProvider)
+    assert client_or.provider.api_key == "test-openrouter"
+
+
+def test_factory_create_method() -> None:
+    """Test AIGateway.create() returns direct BaseAIProvider instances."""
+    p_deepseek = AIGateway.create("deepseek", api_key="test-key")
+    assert isinstance(p_deepseek, DeepSeekProvider)
+
+    p_gemini = AIGateway.create("gemini_free", api_key="test-key")
+    assert isinstance(p_gemini, GeminiFreeProvider)
+
+    p_mistral = AIGateway.create("mistral", api_key="test-key")
+    assert isinstance(p_mistral, MistralProvider)
+
+    p_nvidia = AIGateway.create("nvidia", api_key="test-key")
+    assert isinstance(p_nvidia, NvidiaProvider)
+
+    p_openrouter = AIGateway.create("openrouter", api_key="test-key")
+    assert isinstance(p_openrouter, OpenRouterProvider)
+
+
+def test_available_providers() -> None:
+    """Test available_providers list."""
+    providers = AIGateway.available_providers()
+    assert "deepseek" in providers
+    assert "gemini_free" in providers
+    assert "gemini_pro" in providers
+    assert "mistral" in providers
+
+
+@pytest.mark.asyncio
+async def test_deepseek_account_balance_mocked() -> None:
+    """Test DeepSeek get_account_info method."""
+    mock_payload = {
+        "is_available": True,
+        "balance_infos": [
+            {
+                "currency": "USD",
+                "total_balance": "15.50",
+                "granted_balance": "5.00",
+                "topped_up_balance": "10.50",
+            }
+        ],
+    }
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("GET", "https://api.deepseek.com/user/balance"),
+    )
+
+    async with AIGateway(provider="deepseek", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+
+            info = await client.get_account_info()
+            assert isinstance(info, AccountInfo)
+            assert info.total_balance == 15.50
+            assert info.granted_balance == 5.00
+            assert info.currency == "USD"
+            assert "Solde restant: $15.50" in info.format_summary()
+
+
+@pytest.mark.asyncio
+async def test_openrouter_account_info_mocked() -> None:
+    """Test OpenRouter get_account_info method."""
+    mock_auth_payload = {
+        "data": {
+            "label": "My Dev Key",
+            "usage": 1.25,
+            "limit": 10.0,
+            "is_free_tier": False,
+            "rate_limit": {"requests": 20, "interval": "10s"},
+        }
+    }
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_auth_payload,
+        request=httpx.Request("GET", "https://openrouter.ai/api/v1/auth/key"),
+    )
+
+    async with AIGateway(provider="openrouter", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+
+            info = await client.get_account_info()
+            assert isinstance(info, AccountInfo)
+            assert info.total_usage == 1.25
+            assert info.total_balance == 8.75  # 10.0 - 1.25
+            assert "Solde restant: $8.75" in info.format_summary()
+
+
+@pytest.mark.asyncio
+async def test_list_models_openrouter_mocked() -> None:
+    """Test OpenRouter list_models parsing pricing and free filter."""
+    mock_payload = {
+        "data": [
+            {
+                "id": "google/gemini-2.0-flash-exp:free",
+                "name": "Google: Gemini 2.0 Flash Exp (free)",
+                "context_length": 1048576,
+                "pricing": {"prompt": "0", "completion": "0"},
+            },
+            {
+                "id": "openai/gpt-4o",
+                "name": "OpenAI: GPT-4o",
+                "context_length": 128000,
+                "pricing": {"prompt": "0.0000025", "completion": "0.000010"},
+            },
+        ]
+    }
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("GET", "https://openrouter.ai/api/v1/models"),
+    )
+
+    async with AIGateway(provider="openrouter", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+
+            # All models
+            all_models = await client.list_models()
+            assert len(all_models) == 2
+            assert all_models[0].is_free is True
+            assert all_models[1].is_free is False
+            assert all_models[1].pricing is not None
+            assert all_models[1].pricing.prompt_per_million == 2.5
+
+            # Free only
+            free_models = await client.list_models(free_only=True)
+            assert len(free_models) == 1
+            assert free_models[0].id == "google/gemini-2.0-flash-exp:free"
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_generation_mocked() -> None:
+    """Test OpenAI-compatible generation with mocked HTTP response."""
+    mock_payload = {
+        "id": "chatcmpl-123",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello from OpenRouter!",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+        },
+    }
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
+    )
+
+    async with AIGateway(provider="openrouter", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+
+            resp = await client.generate_text(
+                "Bonjour !",
+                system_prompt="Tu es un assistant.",
+            )
+
+            assert isinstance(resp, AIResponse)
+            assert resp.text == "Hello from OpenRouter!"
+            assert resp.provider == "openrouter"
+            assert resp.usage is not None
+            assert resp.usage.total_tokens == 15
+            assert resp.finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_gemini_generation_mocked() -> None:
+    """Test Google Gemini generation with mocked HTTP response."""
+    mock_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"text": "Hello from Gemini!"}],
+                    "role": "model",
+                },
+                "finishReason": "STOP",
+                "index": 0,
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 8,
+            "totalTokenCount": 20,
+        },
+    }
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"),
+    )
+
+    async with AIGateway(provider="gemini_free", api_key="test-gemini-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+
+            resp = await client.generate_text(
+                "Hello Gemini!",
+                system_prompt="You are an expert.",
+            )
+
+            assert isinstance(resp, AIResponse)
+            assert resp.text == "Hello from Gemini!"
+            assert resp.provider == "gemini_free"
+            assert resp.usage is not None
+            assert resp.usage.total_tokens == 20
+            assert resp.finish_reason == "STOP"
+
+
+@pytest.mark.asyncio
+async def test_chat_multi_turn() -> None:
+    """Test chat multi-turn functionality."""
+    mock_payload = {
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": "Je vais très bien, merci !"},
+                "finish_reason": "stop",
+            }
+        ]
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://integrate.api.nvidia.com/v1/chat/completions"),
+    )
+
+    client = AIGateway("nvidia_free", api_key="test-nv-key")
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+
+        messages = [
+            ChatMessage(role="user", content="Bonjour, comment vas-tu ?"),
+        ]
+        resp = await client.chat(messages=messages)
+        assert resp.text == "Je vais très bien, merci !"
+        assert resp.provider == "nvidia"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_auth_error_handling() -> None:
+    """Test that HTTP 401 raises AuthenticationError."""
+    mock_response = httpx.Response(
+        status_code=401,
+        json={"error": {"message": "Invalid API key"}},
+        request=httpx.Request("POST", "https://api.deepseek.com/chat/completions"),
+    )
+
+    async with AIGateway(provider="deepseek", api_key="invalid-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+
+            with pytest.raises(AuthenticationError) as exc_info:
+                await client.generate_text("Test prompt")
+
+            assert exc_info.value.status_code == 401
+            assert exc_info.value.provider == "deepseek"
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_handling() -> None:
+    """Test that HTTP 429 raises RateLimitError."""
+    mock_response = httpx.Response(
+        status_code=429,
+        json={"error": "Too Many Requests"},
+        request=httpx.Request("POST", "https://api.mistral.ai/v1/chat/completions"),
+    )
+
+    async with AIGateway(provider="mistral", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+
+            with pytest.raises(RateLimitError) as exc_info:
+                await client.generate_text("Test prompt")
+
+            assert exc_info.value.status_code == 429
+            assert exc_info.value.provider == "mistral"
+
+
+@pytest.mark.asyncio
+async def test_connection_error_handling() -> None:
+    """Test that network failures raise APIConnectionError."""
+    async with AIGateway(provider="mistral", api_key="test-key") as client:
+        with patch.object(httpx.AsyncClient, "post", side_effect=httpx.ConnectError("Connection refused")):
+            with pytest.raises(APIConnectionError) as exc_info:
+                await client.generate_text("Test prompt")
+            assert "mistral" in exc_info.value.provider
+
+
+@pytest.mark.asyncio
+async def test_timeout_error_handling() -> None:
+    """Test that timeouts raise APITimeoutError."""
+    async with AIGateway(provider="deepseek", api_key="test-key", timeout=5.0) as client:
+        with patch.object(httpx.AsyncClient, "post", side_effect=httpx.TimeoutException("Read timed out")):
+            with pytest.raises(APITimeoutError) as exc_info:
+                await client.generate_text("Test prompt")
+            assert exc_info.value.timeout_seconds == 5.0
