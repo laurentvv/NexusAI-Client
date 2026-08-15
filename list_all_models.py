@@ -31,9 +31,10 @@ PROVIDERS = [
     ("deepseek", "1. DeepSeek (Paid API)"),
     ("gemini_free", "2. Google Gemini (Google AI Studio Free Tier)"),
     ("gemini_pro", "3. Google Gemini (Paid Pro Tier)"),
-    ("mistral", "4. Mistral AI (Platform)"),
-    ("nvidia_free", "5. Nvidia NIM (Free Tier NGC)"),
-    ("openrouter", "6. OpenRouter (Multi-Provider Hub)"),
+    ("groq", "4. Groq (Free Tier LPU Acceleration)"),
+    ("mistral", "5. Mistral AI (Platform)"),
+    ("nvidia_free", "6. Nvidia NIM (Free Tier NGC)"),
+    ("openrouter", "7. OpenRouter (Multi-Provider Hub)"),
 ]
 
 

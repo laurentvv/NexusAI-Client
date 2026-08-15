@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>An ultra-lightweight, strictly-typed, asynchronous Python 3.14 gateway for multi-provider AI APIs.</strong><br>
-  <em>Unify DeepSeek, Google Gemini (Free & Pro), Mistral, Nvidia NIM, and OpenRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
+  <em>Unify DeepSeek, Google Gemini (Free & Pro), Groq, Mistral, Nvidia NIM, and OpenRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package_manager-uv-DE5FE9.svg?style=flat-square" alt="uv"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
-  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-18%2F18_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-19%2F19_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License MIT"></a>
 </p>
 
@@ -22,15 +22,16 @@
 
 ## 💡 Why NexusAI-Client?
 
-Integrating multiple AI providers in modern Python applications usually requires installing **5 or 6 separate proprietary SDKs** (`google-genai`, `openai`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
+Integrating multiple AI providers in modern Python applications usually requires installing **6 or 7 separate proprietary SDKs** (`google-genai`, `openai`, `groq`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
 
 **NexusAI-Client** solves this at the core:
 - 🪶 **Zero Heavyweight Dependencies**: Powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming**: Stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
-- 🔄 **Zero-Cost-First Smart Fallback**: Automatic progression from 100% Free Tiers to Paid Backups (`AIGateway.auto_fallback()`).
+- 🔄 **Zero-Cost-First Smart Fallback**: Automatic progression from 100% Free Tiers (Gemini, Groq, Nvidia, OpenRouter, Mistral) to Paid Backups (`AIGateway.auto_fallback()`).
+- 🚀 **Ultra-Fast LPU Acceleration**: Native Groq integration for sub-second inference speeds (Llama 3.3 70B, DeepSeek R1 Distill).
 - 🎯 **Guaranteed JSON Outputs**: Native `json_mode=True` across all supported providers.
 - 💰 **Live Account & Budget Inspection**: Inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
-- 🔍 **640+ Models Discovered Live**: Automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
+- 🔍 **650+ Models Discovered Live**: Automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
 
 ---
 
@@ -41,19 +42,19 @@ Why pay for AI calls when you can leverage high-throughput free tiers first, wit
 **`NexusAI-Client` automatically prioritizes zero-cost models before touching your wallet:**
 
 ```
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │                        100% FREE ZERO-COST TIERS                         │
-  ├───────────────────┬───────────────────┬──────────────────┬───────────────┤
-  │ 1. Gemini Free    │ 2. Nvidia NIM     │ 3. OpenRouter    │ 4. Mistral    │
-  │ (1M Token Context)│ (1,000 Credits)   │ (Auto Free Hub)  │ (Small/Code)  │
-  └─────────┬─────────┴─────────┬─────────┴────────┬─────────┴───────┬───────┘
-            │                   │                  │                 │
-            ▼ (If Rate-Limited / 429 Quota Exceeded / Network Outage)▼
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │                    ULTRA-LOW-COST PAID BACKUP TIERS                      │
-  ├───────────────────────────────────────┬──────────────────────────────────┤
-  │ 5. DeepSeek ($0.27 / 1M tokens)       │ 6. Gemini Pro (Enterprise GCP)   │
-  └───────────────────────────────────────┴──────────────────────────────────┘
+  ┌────────────────────────────────────────────────────────────────────────────────────────┐
+  │                               100% FREE ZERO-COST TIERS                                │
+  ├───────────────────┬───────────────────┬──────────────────┬───────────────┬─────────────┤
+  │ 1. Gemini Free    │ 2. Groq LPU       │ 3. Nvidia NIM    │ 4. OpenRouter │ 5. Mistral  │
+  │ (1M Context)      │ (Ultra-Fast 70B)  │ (1,000 Credits)  │ (Free Hub)    │ (Small/Code)│
+  └─────────┬─────────┴─────────┬─────────┴────────┬─────────┴───────┬───────┴──────┬──────┘
+            │                   │                  │                 │              │
+            ▼ (If Rate-Limited / 429 Quota Exceeded / Network Outage / Timeout)   ▼
+  ┌────────────────────────────────────────────────────────────────────────────────────────┐
+  │                           ULTRA-LOW-COST PAID BACKUP TIERS                             │
+  ├───────────────────────────────────────────┬────────────────────────────────────────────┤
+  │ 6. DeepSeek ($0.27 / 1M tokens)           │ 7. Gemini Pro (Enterprise GCP)             │
+  └───────────────────────────────────────────┴────────────────────────────────────────────┘
 ```
 
 ### 1-Line Zero-Cost Failover in Your Code:
@@ -82,6 +83,7 @@ if __name__ == "__main__":
 | **DeepSeek** | `"deepseek"` | Paid | OpenAI Chat API | `deepseek-chat` | Real-time USD Balance (`GET /user/balance`) |
 | **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-2.5-flash` | Quotas: 15 RPM \| 1M TPM \| 1,500 RPD |
 | **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-2.5-pro` | Google Cloud Pay-as-you-go Billing |
+| **Groq** | `"groq"` (or `"groq_free"`) | Free (LPU) | OpenAI Chat API | `llama-3.3-70b-versatile` | Quotas: 30 RPM \| 14,400 RPD \| 30k TPM |
 | **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
 | **Nvidia NIM** | `"nvidia_free"` | Free (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1,000 Free GPU Inference Credits (NGC) |
 | **OpenRouter** | `"openrouter"` | Free & Paid | OpenAI Chat API | `openrouter/free` | 19 Free models live + 390 Commercial models |
@@ -107,6 +109,7 @@ Create a `.env` file at the root of your project:
 ```env
 # Free Tiers (Priority 1)
 GEMINI_FREE_API_KEY=your_google_ai_studio_key
+GROQ_API_KEY=gsk_your_groq_key
 NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
 MISTRAL_API_KEY=your_mistral_api_key
@@ -123,7 +126,7 @@ import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    async with AIGateway("gemini_free") as client:
+    async with AIGateway("groq") as client:
         response = await client.generate_text("Explain the theory of relativity in 2 sentences.")
         print(response.text)
 
@@ -142,8 +145,8 @@ import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    async with AIGateway("openrouter") as client:
-        async for chunk in client.stream_text("Write a short poem about space exploration."):
+    async with AIGateway("groq") as client:
+        async for chunk in client.stream_text("Write a short poem about lightning fast LPUs."):
             print(chunk, end="", flush=True)
 
 if __name__ == "__main__":
@@ -159,8 +162,8 @@ import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    # Priority: Free Gemini -> Free Nvidia NIM -> Free OpenRouter -> Paid DeepSeek
-    custom_chain = ["gemini_free", "nvidia_free", "openrouter", "deepseek"]
+    # Priority: Free Gemini -> Free Groq -> Free Nvidia NIM -> Paid DeepSeek
+    custom_chain = ["gemini_free", "groq", "nvidia_free", "openrouter", "deepseek"]
     async with AIGateway.with_fallback(custom_chain) as client:
         res = await client.generate_text("Summarize the key advantages of Python 3.14.")
         print(f"[{res.provider}] {res.text}")
@@ -195,7 +198,7 @@ import asyncio, json
 from nexusai_client import AIGateway
 
 async def main():
-    async with AIGateway("gemini_free") as client:
+    async with AIGateway("groq") as client:
         res = await client.generate_text(
             prompt="Extract profile data: Alice, 28 years old, Software Engineer.",
             json_mode=True,
@@ -237,7 +240,7 @@ uv run python verify_access.py
 ```
 *Validates `.env` keys, inspects real-time balances, tests inference, and measures network latency in milliseconds.*
 
-### 2. Live Catalog Explorer (640+ Models)
+### 2. Live Catalog Explorer (650+ Models)
 ```bash
 # List free-tier models only
 uv run python list_all_models.py --free

@@ -16,6 +16,8 @@ class ProviderType(StrEnum):
     DEEPSEEK = "deepseek"
     GEMINI_PRO = "gemini_pro"
     GEMINI_FREE = "gemini_free"
+    GROQ = "groq"
+    GROQ_FREE = "groq_free"
     MISTRAL = "mistral"
     NVIDIA = "nvidia"
     NVIDIA_FREE = "nvidia_free"

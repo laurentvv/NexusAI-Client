@@ -53,6 +53,11 @@ class ProviderDefaults:
     OPENROUTER_MODEL: Final[str] = "openrouter/free"
     OPENROUTER_ENV_KEY: Final[str] = "OPENROUTER_API_KEY"
 
+    # Groq (Ultra-Fast Free LPU Tier)
+    GROQ_BASE_URL: Final[str] = "https://api.groq.com/openai/v1"
+    GROQ_MODEL: Final[str] = "llama-3.3-70b-versatile"
+    GROQ_ENV_KEY: Final[str] = "GROQ_API_KEY"
+
     # Global
     DEFAULT_TIMEOUT: Final[float] = 60.0
 
@@ -123,6 +128,23 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_model=ProviderDefaults.MISTRAL_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
+    ),
+    # Groq (Ultra-Fast LPU Free Tier)
+    "groq": _ProviderMeta(
+        name="Groq",
+        env_key=ProviderDefaults.GROQ_ENV_KEY,
+        default_base_url=ProviderDefaults.GROQ_BASE_URL,
+        default_model=ProviderDefaults.GROQ_MODEL,
+        env_base_url_var="GROQ_BASE_URL",
+        env_model_var="GROQ_DEFAULT_MODEL",
+    ),
+    "groq_free": _ProviderMeta(
+        name="Groq",
+        env_key=ProviderDefaults.GROQ_ENV_KEY,
+        default_base_url=ProviderDefaults.GROQ_BASE_URL,
+        default_model=ProviderDefaults.GROQ_MODEL,
+        env_base_url_var="GROQ_BASE_URL",
+        env_model_var="GROQ_DEFAULT_MODEL",
     ),
     # Nvidia NIM
     "nvidia": _ProviderMeta(

@@ -21,7 +21,6 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 
 from nexusai_client import (
     AIGateway,
-    ChatMessage,
     MissingAPIKeyError,
     NexusAIError,
 )

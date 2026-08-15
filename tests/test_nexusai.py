@@ -22,6 +22,7 @@ from nexusai_client import (
     FallbackGateway,
     GeminiFreeProvider,
     GeminiProProvider,
+    GroqProvider,
     MissingAPIKeyError,
     MistralProvider,
     ModelInfo,
@@ -77,7 +78,12 @@ def test_instantiate_with_direct_key() -> None:
     assert isinstance(client_nv.provider, NvidiaProvider)
     assert client_nv.provider.api_key == "test-nvidia"
 
-    # 6. OpenRouter
+    # 6. Groq
+    client_groq = AIGateway(provider="groq", api_key="test-groq")
+    assert isinstance(client_groq.provider, GroqProvider)
+    assert client_groq.provider.api_key == "test-groq"
+
+    # 7. OpenRouter
     client_or = AIGateway(provider="openrouter", api_key="test-openrouter")
     assert isinstance(client_or.provider, OpenRouterProvider)
     assert client_or.provider.api_key == "test-openrouter"
@@ -90,6 +96,9 @@ def test_factory_create_method() -> None:
 
     p_gemini = AIGateway.create("gemini_free", api_key="test-key")
     assert isinstance(p_gemini, GeminiFreeProvider)
+
+    p_groq = AIGateway.create("groq", api_key="test-key")
+    assert isinstance(p_groq, GroqProvider)
 
     p_mistral = AIGateway.create("mistral", api_key="test-key")
     assert isinstance(p_mistral, MistralProvider)
@@ -107,6 +116,7 @@ def test_available_providers() -> None:
     assert "deepseek" in providers
     assert "gemini_free" in providers
     assert "gemini_pro" in providers
+    assert "groq (or groq_free)" in providers
     assert "mistral" in providers
 
 
@@ -231,6 +241,34 @@ async def test_openrouter_account_info_mocked() -> None:
             assert info.total_usage == 1.25
             assert info.total_balance == 8.75
             assert "Solde restant: $8.75" in info.format_summary()
+
+
+@pytest.mark.asyncio
+async def test_groq_account_info_and_models() -> None:
+    """Test Groq account info and models discovery."""
+    mock_models_payload = {
+        "data": [
+            {"id": "llama-3.3-70b-versatile", "object": "model", "owned_by": "meta"},
+            {"id": "mixtral-8x7b-32768", "object": "model", "owned_by": "mistralai"},
+        ]
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_models_payload,
+        request=httpx.Request("GET", "https://api.groq.com/openai/v1/models"),
+    )
+    async with AIGateway(provider="groq", api_key="gsk_test") as client:
+        info = await client.get_account_info()
+        assert info.provider == "groq"
+        assert "30 RPM" in (info.rate_limit_info or "")
+
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            models = await client.list_models()
+            assert len(models) == 2
+            assert models[0].id == "llama-3.3-70b-versatile"
+            assert models[0].is_free is True
+            assert models[0].context_length == 128_000
 
 
 @pytest.mark.asyncio

@@ -59,6 +59,7 @@ In your application's `.env` file, specify the API keys for the providers you wa
 ```env
 # Free Tiers
 GEMINI_FREE_API_KEY=your_google_ai_studio_key
+GROQ_API_KEY=gsk_your_groq_key
 MISTRAL_API_KEY=your_mistral_api_key
 NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
@@ -80,7 +81,7 @@ from nexusai_client import AIGateway
 
 async def ask_ai(
     prompt: str,
-    provider: str = "gemini_free",
+    provider: str = "groq",
     system_prompt: str | None = None,
     temperature: float = 0.3,
 ) -> str:
@@ -98,7 +99,7 @@ async def main():
     reply = await ask_ai(
         prompt="Suggest 3 catchy domain names for an AI analytics platform.",
         system_prompt="You are a creative branding expert.",
-        provider="gemini_free", # or "nvidia_free", "mistral", "openrouter", "deepseek"
+        provider="groq", # or "gemini_free", "nvidia_free", "mistral", "openrouter", "deepseek"
     )
     print(reply)
 
@@ -119,8 +120,8 @@ from nexusai_client import AIGateway, NexusAIError
 
 logger = logging.getLogger(__name__)
 
-# Fallback order: Gemini Free -> Nvidia NIM -> OpenRouter -> DeepSeek (Paid)
-PROVIDER_CHAIN = ["gemini_free", "nvidia_free", "openrouter", "deepseek"]
+# Fallback order: Gemini Free -> Groq LPU -> Nvidia NIM -> OpenRouter -> DeepSeek (Paid)
+PROVIDER_CHAIN = ["gemini_free", "groq", "nvidia_free", "openrouter", "deepseek"]
 
 async def ask_ai_with_fallback(prompt: str, system_prompt: str | None = None) -> tuple[str, str]:
     """Attempt generation across providers in priority order until success.
@@ -333,6 +334,7 @@ except NexusAIError as e:
 | :--- | :--- | :--- | :--- |
 | `"gemini_free"` | Google AI Studio | Free | `gemini-2.5-flash` |
 | `"gemini_pro"` | Google AI Studio Pro | Paid | `gemini-2.5-pro` |
+| `"groq"` (or `"groq_free"`) | Groq Cloud LPU | Free (30 RPM) | `llama-3.3-70b-versatile` |
 | `"nvidia_free"` (or `"nvidia"`) | Nvidia NIM | Free (1,000 credits) | `meta/llama-3.1-8b-instruct` |
 | `"openrouter"` | OpenRouter | Free (`:free`) & Paid | `openrouter/free` |
 | `"mistral"` | Mistral AI | Free & Paid | `mistral-small-latest` |

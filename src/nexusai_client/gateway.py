@@ -26,6 +26,7 @@ from nexusai_client.models import (
 from nexusai_client.providers.base import BaseAIProvider
 from nexusai_client.providers.deepseek import DeepSeekProvider
 from nexusai_client.providers.gemini import GeminiFreeProvider, GeminiProProvider
+from nexusai_client.providers.groq import GroqProvider
 from nexusai_client.providers.mistral import MistralProvider
 from nexusai_client.providers.nvidia import NvidiaProvider
 from nexusai_client.providers.openrouter import OpenRouterProvider
@@ -47,6 +48,12 @@ _PROVIDER_REGISTRY: ProviderClassMap = {
     "gemini_free": GeminiFreeProvider,
     "gemini-free": GeminiFreeProvider,
     "gemini": GeminiFreeProvider,
+    # Groq (Free LPU Tier)
+    ProviderType.GROQ: GroqProvider,
+    ProviderType.GROQ_FREE: GroqProvider,
+    "groq": GroqProvider,
+    "groq_free": GroqProvider,
+    "groq-free": GroqProvider,
     # Mistral
     ProviderType.MISTRAL: MistralProvider,
     "mistral": MistralProvider,
@@ -334,7 +341,7 @@ class AIGateway:
         Returns:
             List of configured provider strings (e.g. ['gemini_free', 'nvidia_free', 'openrouter', 'deepseek']).
         """
-        free_candidates = ["gemini_free", "nvidia_free", "openrouter", "mistral"]
+        free_candidates = ["gemini_free", "groq_free", "nvidia_free", "openrouter", "mistral"]
         paid_candidates = ["deepseek", "gemini_pro"]
 
         configured_free: list[str] = []
@@ -393,6 +400,7 @@ class AIGateway:
             "deepseek",
             "gemini_pro",
             "gemini_free",
+            "groq (or groq_free)",
             "mistral",
             "nvidia (or nvidia_free)",
             "openrouter (or openrouter_free)",
@@ -407,7 +415,7 @@ class AIGateway:
         free_only: bool = False,
     ) -> dict[str, list[ModelInfo]]:
         """Query multiple or all providers in parallel to list available models."""
-        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "mistral", "nvidia", "openrouter"]
+        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "groq", "mistral", "nvidia", "openrouter"]
         results: dict[str, list[ModelInfo]] = {}
 
         async def _fetch(p_name: str) -> tuple[str, list[ModelInfo]]:
@@ -434,7 +442,7 @@ class AIGateway:
         providers: list[str] | None = None,
     ) -> dict[str, AccountInfo]:
         """Query budget, credits, and quotas across multiple or all providers in parallel."""
-        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "mistral", "nvidia", "openrouter"]
+        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "groq", "mistral", "nvidia", "openrouter"]
         results: dict[str, AccountInfo] = {}
 
         async def _fetch_info(p_name: str) -> tuple[str, AccountInfo | None]:

@@ -9,6 +9,7 @@ from nexusai_client.providers.gemini import (
     GeminiFreeProvider,
     GeminiProProvider,
 )
+from nexusai_client.providers.groq import GroqProvider
 from nexusai_client.providers.mistral import MistralProvider
 from nexusai_client.providers.nvidia import NvidiaProvider
 from nexusai_client.providers.openai_compat import OpenAICompatibleProvider
@@ -21,6 +22,7 @@ __all__ = [
     "GeminiBaseProvider",
     "GeminiFreeProvider",
     "GeminiProProvider",
+    "GroqProvider",
     "MistralProvider",
     "NvidiaProvider",
     "OpenRouterProvider",
