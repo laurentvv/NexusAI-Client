@@ -32,9 +32,11 @@ PROVIDERS = [
     ("gemini_free", "2. Google Gemini (Google AI Studio Free Tier)"),
     ("gemini_pro", "3. Google Gemini (Paid Pro Tier)"),
     ("groq", "4. Groq (Free Tier LPU Acceleration)"),
-    ("mistral", "5. Mistral AI (Platform)"),
-    ("nvidia_free", "6. Nvidia NIM (Free Tier NGC)"),
-    ("openrouter", "7. OpenRouter (Multi-Provider Hub)"),
+    ("cerebras", "5. Cerebras (Free Tier Wafer-Scale CS-3)"),
+    ("cohere", "6. Cohere (Free Trial Command R+)"),
+    ("mistral", "7. Mistral AI (Platform)"),
+    ("nvidia_free", "8. Nvidia NIM (Free Tier NGC)"),
+    ("openrouter", "9. OpenRouter (Multi-Provider Hub)"),
 ]
 
 

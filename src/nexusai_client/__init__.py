@@ -41,6 +41,8 @@ from nexusai_client.models import (
 )
 from nexusai_client.providers import (
     BaseAIProvider,
+    CerebrasProvider,
+    CohereProvider,
     DeepSeekProvider,
     GeminiBaseProvider,
     GeminiFreeProvider,
@@ -71,6 +73,8 @@ __all__ = [
     # Providers
     "BaseAIProvider",
     "OpenAICompatibleProvider",
+    "CerebrasProvider",
+    "CohereProvider",
     "DeepSeekProvider",
     "GeminiBaseProvider",
     "GeminiFreeProvider",

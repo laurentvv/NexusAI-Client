@@ -16,7 +16,9 @@ from nexusai_client import (
     APITimeoutError,
     AuthenticationError,
     BaseAIProvider,
+    CerebrasProvider,
     ChatMessage,
+    CohereProvider,
     Config,
     DeepSeekProvider,
     FallbackGateway,
@@ -83,7 +85,17 @@ def test_instantiate_with_direct_key() -> None:
     assert isinstance(client_groq.provider, GroqProvider)
     assert client_groq.provider.api_key == "test-groq"
 
-    # 7. OpenRouter
+    # 7. Cerebras
+    client_cb = AIGateway(provider="cerebras", api_key="test-cerebras")
+    assert isinstance(client_cb.provider, CerebrasProvider)
+    assert client_cb.provider.api_key == "test-cerebras"
+
+    # 8. Cohere
+    client_co = AIGateway(provider="cohere", api_key="test-cohere")
+    assert isinstance(client_co.provider, CohereProvider)
+    assert client_co.provider.api_key == "test-cohere"
+
+    # 9. OpenRouter
     client_or = AIGateway(provider="openrouter", api_key="test-openrouter")
     assert isinstance(client_or.provider, OpenRouterProvider)
     assert client_or.provider.api_key == "test-openrouter"
@@ -100,6 +112,12 @@ def test_factory_create_method() -> None:
     p_groq = AIGateway.create("groq", api_key="test-key")
     assert isinstance(p_groq, GroqProvider)
 
+    p_cerebras = AIGateway.create("cerebras", api_key="test-key")
+    assert isinstance(p_cerebras, CerebrasProvider)
+
+    p_cohere = AIGateway.create("cohere", api_key="test-key")
+    assert isinstance(p_cohere, CohereProvider)
+
     p_mistral = AIGateway.create("mistral", api_key="test-key")
     assert isinstance(p_mistral, MistralProvider)
 
@@ -113,6 +131,8 @@ def test_factory_create_method() -> None:
 def test_available_providers() -> None:
     """Test available_providers list."""
     providers = AIGateway.available_providers()
+    assert "cerebras (or cerebras_free)" in providers
+    assert "cohere (or cohere_free)" in providers
     assert "deepseek" in providers
     assert "gemini_free" in providers
     assert "gemini_pro" in providers
@@ -269,6 +289,64 @@ async def test_groq_account_info_and_models() -> None:
             assert models[0].id == "llama-3.3-70b-versatile"
             assert models[0].is_free is True
             assert models[0].context_length == 128_000
+
+
+@pytest.mark.asyncio
+async def test_cerebras_account_info_and_models() -> None:
+    """Test Cerebras account info and models discovery."""
+    mock_models_payload = {
+        "data": [
+            {"id": "llama-3.3-70b", "object": "model", "owned_by": "meta"},
+        ]
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_models_payload,
+        request=httpx.Request("GET", "https://api.cerebras.ai/v1/models"),
+    )
+    async with AIGateway(provider="cerebras", api_key="csk_test") as client:
+        info = await client.get_account_info()
+        assert info.provider == "cerebras"
+        assert "30 RPM" in (info.rate_limit_info or "")
+
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            models = await client.list_models()
+            assert len(models) == 1
+            assert models[0].id == "llama-3.3-70b"
+            assert models[0].is_free is True
+
+
+@pytest.mark.asyncio
+async def test_cohere_account_info_and_generation() -> None:
+    """Test Cohere account info, models discovery, and V2 chat generation."""
+    mock_chat_payload = {
+        "id": "cohere-msg-123",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hello from Cohere Command R+"}],
+        },
+        "usage": {
+            "tokens": {"input_tokens": 10, "output_tokens": 15},
+        },
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_chat_payload,
+        request=httpx.Request("POST", "https://api.cohere.com/v2/chat"),
+    )
+    async with AIGateway(provider="cohere", api_key="cohere_test") as client:
+        info = await client.get_account_info()
+        assert info.provider == "cohere"
+        assert "20 RPM" in (info.rate_limit_info or "")
+
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+            res = await client.generate_text("Hi Cohere")
+            assert res.text == "Hello from Cohere Command R+"
+            assert res.provider == "cohere"
+            assert res.usage is not None
+            assert res.usage.total_tokens == 25
 
 
 @pytest.mark.asyncio

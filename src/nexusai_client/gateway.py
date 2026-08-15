@@ -24,6 +24,8 @@ from nexusai_client.models import (
     ProviderType,
 )
 from nexusai_client.providers.base import BaseAIProvider
+from nexusai_client.providers.cerebras import CerebrasProvider
+from nexusai_client.providers.cohere import CohereProvider
 from nexusai_client.providers.deepseek import DeepSeekProvider
 from nexusai_client.providers.gemini import GeminiFreeProvider, GeminiProProvider
 from nexusai_client.providers.groq import GroqProvider
@@ -36,6 +38,18 @@ logger = logging.getLogger("nexusai_client")
 type ProviderClassMap = dict[str, type[BaseAIProvider]]
 
 _PROVIDER_REGISTRY: ProviderClassMap = {
+    # Cerebras (Wafer-Scale Free Tier)
+    ProviderType.CEREBRAS: CerebrasProvider,
+    ProviderType.CEREBRAS_FREE: CerebrasProvider,
+    "cerebras": CerebrasProvider,
+    "cerebras_free": CerebrasProvider,
+    "cerebras-free": CerebrasProvider,
+    # Cohere (Enterprise & Free Trial Tier)
+    ProviderType.COHERE: CohereProvider,
+    ProviderType.COHERE_FREE: CohereProvider,
+    "cohere": CohereProvider,
+    "cohere_free": CohereProvider,
+    "cohere-free": CohereProvider,
     # DeepSeek
     ProviderType.DEEPSEEK: DeepSeekProvider,
     "deepseek": DeepSeekProvider,
@@ -341,7 +355,15 @@ class AIGateway:
         Returns:
             List of configured provider strings (e.g. ['gemini_free', 'nvidia_free', 'openrouter', 'deepseek']).
         """
-        free_candidates = ["gemini_free", "groq_free", "nvidia_free", "openrouter", "mistral"]
+        free_candidates = [
+            "gemini_free",
+            "groq_free",
+            "cerebras_free",
+            "nvidia_free",
+            "openrouter",
+            "cohere_free",
+            "mistral",
+        ]
         paid_candidates = ["deepseek", "gemini_pro"]
 
         configured_free: list[str] = []
@@ -397,6 +419,8 @@ class AIGateway:
     def available_providers(cls) -> list[str]:
         """Return a sorted list of unique supported provider names."""
         unique_names = {
+            "cerebras (or cerebras_free)",
+            "cohere (or cohere_free)",
             "deepseek",
             "gemini_pro",
             "gemini_free",
@@ -415,7 +439,17 @@ class AIGateway:
         free_only: bool = False,
     ) -> dict[str, list[ModelInfo]]:
         """Query multiple or all providers in parallel to list available models."""
-        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "groq", "mistral", "nvidia", "openrouter"]
+        target_providers = providers or [
+            "cerebras",
+            "cohere",
+            "deepseek",
+            "gemini_free",
+            "gemini_pro",
+            "groq",
+            "mistral",
+            "nvidia",
+            "openrouter",
+        ]
         results: dict[str, list[ModelInfo]] = {}
 
         async def _fetch(p_name: str) -> tuple[str, list[ModelInfo]]:
@@ -442,7 +476,17 @@ class AIGateway:
         providers: list[str] | None = None,
     ) -> dict[str, AccountInfo]:
         """Query budget, credits, and quotas across multiple or all providers in parallel."""
-        target_providers = providers or ["deepseek", "gemini_free", "gemini_pro", "groq", "mistral", "nvidia", "openrouter"]
+        target_providers = providers or [
+            "cerebras",
+            "cohere",
+            "deepseek",
+            "gemini_free",
+            "gemini_pro",
+            "groq",
+            "mistral",
+            "nvidia",
+            "openrouter",
+        ]
         results: dict[str, AccountInfo] = {}
 
         async def _fetch_info(p_name: str) -> tuple[str, AccountInfo | None]:

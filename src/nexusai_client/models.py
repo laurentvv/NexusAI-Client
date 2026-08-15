@@ -13,6 +13,10 @@ from typing import Any, Literal
 class ProviderType(StrEnum):
     """Supported AI Providers in NexusAI-Client."""
 
+    CEREBRAS = "cerebras"
+    CEREBRAS_FREE = "cerebras_free"
+    COHERE = "cohere"
+    COHERE_FREE = "cohere_free"
     DEEPSEEK = "deepseek"
     GEMINI_PRO = "gemini_pro"
     GEMINI_FREE = "gemini_free"

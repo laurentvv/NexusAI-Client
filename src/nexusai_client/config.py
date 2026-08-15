@@ -58,6 +58,16 @@ class ProviderDefaults:
     GROQ_MODEL: Final[str] = "llama-3.3-70b-versatile"
     GROQ_ENV_KEY: Final[str] = "GROQ_API_KEY"
 
+    # Cerebras (Wafer-Scale Ultra-Fast Inference)
+    CEREBRAS_BASE_URL: Final[str] = "https://api.cerebras.ai/v1"
+    CEREBRAS_MODEL: Final[str] = "llama-3.3-70b"
+    CEREBRAS_ENV_KEY: Final[str] = "CEREBRAS_API_KEY"
+
+    # Cohere (Enterprise & Free Trial Tier)
+    COHERE_BASE_URL: Final[str] = "https://api.cohere.com/v2"
+    COHERE_MODEL: Final[str] = "command-r-plus-08-2024"
+    COHERE_ENV_KEY: Final[str] = "COHERE_API_KEY"
+
     # Global
     DEFAULT_TIMEOUT: Final[float] = 60.0
 
@@ -128,6 +138,40 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_model=ProviderDefaults.MISTRAL_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
+    ),
+    # Cerebras (Wafer-Scale Free Inference)
+    "cerebras": _ProviderMeta(
+        name="Cerebras",
+        env_key=ProviderDefaults.CEREBRAS_ENV_KEY,
+        default_base_url=ProviderDefaults.CEREBRAS_BASE_URL,
+        default_model=ProviderDefaults.CEREBRAS_MODEL,
+        env_base_url_var="CEREBRAS_BASE_URL",
+        env_model_var="CEREBRAS_DEFAULT_MODEL",
+    ),
+    "cerebras_free": _ProviderMeta(
+        name="Cerebras",
+        env_key=ProviderDefaults.CEREBRAS_ENV_KEY,
+        default_base_url=ProviderDefaults.CEREBRAS_BASE_URL,
+        default_model=ProviderDefaults.CEREBRAS_MODEL,
+        env_base_url_var="CEREBRAS_BASE_URL",
+        env_model_var="CEREBRAS_DEFAULT_MODEL",
+    ),
+    # Cohere (Enterprise & Free Trial Tier)
+    "cohere": _ProviderMeta(
+        name="Cohere",
+        env_key=ProviderDefaults.COHERE_ENV_KEY,
+        default_base_url=ProviderDefaults.COHERE_BASE_URL,
+        default_model=ProviderDefaults.COHERE_MODEL,
+        env_base_url_var="COHERE_BASE_URL",
+        env_model_var="COHERE_DEFAULT_MODEL",
+    ),
+    "cohere_free": _ProviderMeta(
+        name="Cohere",
+        env_key=ProviderDefaults.COHERE_ENV_KEY,
+        default_base_url=ProviderDefaults.COHERE_BASE_URL,
+        default_model=ProviderDefaults.COHERE_MODEL,
+        env_base_url_var="COHERE_BASE_URL",
+        env_model_var="COHERE_DEFAULT_MODEL",
     ),
     # Groq (Ultra-Fast LPU Free Tier)
     "groq": _ProviderMeta(
