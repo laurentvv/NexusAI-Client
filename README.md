@@ -14,7 +14,7 @@
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package_manager-uv-DE5FE9.svg?style=flat-square" alt="uv"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
-  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-17%2F17_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-18%2F18_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License MIT"></a>
 </p>
 
@@ -27,22 +27,50 @@ Integrating multiple AI providers in modern Python applications usually requires
 **NexusAI-Client** solves this at the core:
 - 🪶 **Zero Heavyweight Dependencies**: Powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming**: Stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
-- 🔄 **Smart Fallback Gateway**: Automatic failover across free and paid providers when rate limits (HTTP 429) or outages occur.
+- 🔄 **Zero-Cost-First Smart Fallback**: Automatic progression from 100% Free Tiers to Paid Backups (`AIGateway.auto_fallback()`).
 - 🎯 **Guaranteed JSON Outputs**: Native `json_mode=True` across all supported providers.
 - 💰 **Live Account & Budget Inspection**: Inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
 - 🔍 **640+ Models Discovered Live**: Automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
 
 ---
 
-## 🏛️ Architecture
+## 🌟 Spotlight: Zero-Cost-First Smart Fallback Routing
+
+Why pay for AI calls when you can leverage high-throughput free tiers first, with seamless automatic fallback to paid commercial models?
+
+**`NexusAI-Client` automatically prioritizes zero-cost models before touching your wallet:**
 
 ```
-                             ┌──► 🟣 DeepSeek (V3 / R1 Reasoner - Live USD Balance)
-                             ├──► 🟡 Google Gemini Free (Google AI Studio - 1M Token Context)
-                             ├──► 🔵 Google Gemini Pro (Paid GCP Tier)
-     [Your Python App] ──► AIGateway ─┼──► 🟠 Mistral AI (Codestral / Small / Large)
-                             ├──► 🟢 Nvidia NIM (1,000 Free Credits / Llama 3.3 70B)
-                             └──► ⚪ OpenRouter (Auto-Router openrouter/free & 400+ Models)
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                        100% FREE ZERO-COST TIERS                         │
+  ├───────────────────┬───────────────────┬──────────────────┬───────────────┤
+  │ 1. Gemini Free    │ 2. Nvidia NIM     │ 3. OpenRouter    │ 4. Mistral    │
+  │ (1M Token Context)│ (1,000 Credits)   │ (Auto Free Hub)  │ (Small/Code)  │
+  └─────────┬─────────┴─────────┬─────────┴────────┬─────────┴───────┬───────┘
+            │                   │                  │                 │
+            ▼ (If Rate-Limited / 429 Quota Exceeded / Network Outage)▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                    ULTRA-LOW-COST PAID BACKUP TIERS                      │
+  ├───────────────────────────────────────┬──────────────────────────────────┤
+  │ 5. DeepSeek ($0.27 / 1M tokens)       │ 6. Gemini Pro (Enterprise GCP)   │
+  └───────────────────────────────────────┴──────────────────────────────────┘
+```
+
+### 1-Line Zero-Cost Failover in Your Code:
+
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # Automatically discovers active keys in .env and routes: Free -> Free -> Paid
+    async with AIGateway.auto_fallback() as client:
+        response = await client.generate_text("Explain quantum computing in 2 sentences.")
+        print(f"✅ Served by [{response.provider}] with zero downtime:")
+        print(response.text)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ---
@@ -77,18 +105,18 @@ uv add --editable /path/to/NexusAI-Client
 Create a `.env` file at the root of your project:
 
 ```env
-# Free Tiers
+# Free Tiers (Priority 1)
 GEMINI_FREE_API_KEY=your_google_ai_studio_key
-MISTRAL_API_KEY=your_mistral_api_key
 NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
+MISTRAL_API_KEY=your_mistral_api_key
 
-# Paid Tiers (Optional)
+# Paid Tiers (Backup Priority 2)
 DEEPSEEK_API_KEY=sk-your_deepseek_key
 GEMINI_PRO_API_KEY=your_gemini_pro_key
 ```
 
-### 3. Basic Generation in 3 Lines of Code
+### 3. Basic Generation
 
 ```python
 import asyncio
@@ -122,17 +150,18 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### 2. Smart Fallback Gateway (Zero Downtime)
+### 2. Custom Fallback Chain (Fine-Grained Strategy)
 
-Automatically failover across a priority list when a provider hits rate limits (HTTP 429) or experiences downtime:
+Define your own explicit priority list:
 
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    # Priority: Free -> Free -> Free -> Paid
-    async with AIGateway.with_fallback(["gemini_free", "nvidia_free", "openrouter", "deepseek"]) as client:
+    # Priority: Free Gemini -> Free Nvidia NIM -> Free OpenRouter -> Paid DeepSeek
+    custom_chain = ["gemini_free", "nvidia_free", "openrouter", "deepseek"]
+    async with AIGateway.with_fallback(custom_chain) as client:
         res = await client.generate_text("Summarize the key advantages of Python 3.14.")
         print(f"[{res.provider}] {res.text}")
 
