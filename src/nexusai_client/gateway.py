@@ -1,14 +1,21 @@
-"""Unified Gateway and Factory for NexusAI-Client.
+"""Unified Gateway, Factory, and Fallback Manager for NexusAI-Client.
 
-Provides a single entry point to instantiate, query, and interact with all supported AI providers.
+Provides a single entry point to instantiate, query, stream, and automatically failover
+across all supported AI providers.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import AsyncIterator
 from typing import Any, Self
 
-from nexusai_client.exceptions import MissingAPIKeyError, ProviderNotFoundError
+from nexusai_client.exceptions import (
+    MissingAPIKeyError,
+    NexusAIError,
+    ProviderNotFoundError,
+)
 from nexusai_client.models import (
     AccountInfo,
     AIResponse,
@@ -22,6 +29,8 @@ from nexusai_client.providers.gemini import GeminiFreeProvider, GeminiProProvide
 from nexusai_client.providers.mistral import MistralProvider
 from nexusai_client.providers.nvidia import NvidiaProvider
 from nexusai_client.providers.openrouter import OpenRouterProvider
+
+logger = logging.getLogger("nexusai_client")
 
 type ProviderClassMap = dict[str, type[BaseAIProvider]]
 
@@ -60,27 +69,196 @@ _PROVIDER_REGISTRY: ProviderClassMap = {
 }
 
 
+class FallbackGateway(BaseAIProvider):
+    """Automatic multi-provider fallback wrapper.
+
+    Sequentially attempts calls across a list of configured providers until one succeeds.
+    """
+
+    def __init__(
+        self,
+        providers: list[ProviderType | str | BaseAIProvider],
+        *,
+        timeout: float = 60.0,
+        **kwargs: Any,
+    ) -> None:
+        if not providers:
+            raise ValueError("FallbackGateway requires at least one provider in the chain.")
+
+        self._provider_chain: list[BaseAIProvider] = []
+        for p in providers:
+            if isinstance(p, BaseAIProvider):
+                self._provider_chain.append(p)
+            else:
+                self._provider_chain.append(AIGateway.create(p, timeout=timeout, **kwargs))
+
+        primary = self._provider_chain[0]
+        super().__init__(
+            api_key=primary.api_key,
+            base_url=primary.base_url,
+            default_model=primary.default_model,
+            timeout=timeout,
+        )
+
+    @property
+    def provider_name(self) -> str:
+        chain_names = " -> ".join(p.provider_name for p in self._provider_chain)
+        return f"fallback({chain_names})"
+
+    async def generate_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Attempt text generation across providers in chain order."""
+        last_error: Exception | None = None
+        for prov in self._provider_chain:
+            try:
+                return await prov.generate_text(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    **kwargs,
+                )
+            except (NexusAIError, Exception) as err:
+                logger.warning(f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                last_error = err
+
+        raise RuntimeError(f"All providers in FallbackGateway chain failed. Last error: {last_error}")
+
+    async def chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Attempt chat completion across providers in chain order."""
+        last_error: Exception | None = None
+        for prov in self._provider_chain:
+            try:
+                return await prov.chat(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    **kwargs,
+                )
+            except (NexusAIError, Exception) as err:
+                logger.warning(f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                last_error = err
+
+        raise RuntimeError(f"All providers in FallbackGateway chain failed. Last error: {last_error}")
+
+    async def stream_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream text from the first operational provider in the chain."""
+        last_error: Exception | None = None
+        for prov in self._provider_chain:
+            try:
+                async for chunk in prov.stream_text(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
+                ):
+                    yield chunk
+                return
+            except (NexusAIError, Exception) as err:
+                logger.warning(f"FallbackGateway: stream '{prov.provider_name}' failed ({err}). Trying next...")
+                last_error = err
+
+        raise RuntimeError(f"All providers in FallbackGateway stream failed. Last error: {last_error}")
+
+    async def stream_chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream chat from the first operational provider in the chain."""
+        last_error: Exception | None = None
+        for prov in self._provider_chain:
+            try:
+                async for chunk in prov.stream_chat(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
+                ):
+                    yield chunk
+                return
+            except (NexusAIError, Exception) as err:
+                logger.warning(f"FallbackGateway: stream_chat '{prov.provider_name}' failed ({err}). Trying next...")
+                last_error = err
+
+        raise RuntimeError(f"All providers in FallbackGateway stream_chat failed. Last error: {last_error}")
+
+    async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:
+        """Aggregate models from all chain providers."""
+        all_models: list[ModelInfo] = []
+        for prov in self._provider_chain:
+            try:
+                all_models.extend(await prov.list_models(free_only=free_only))
+            except Exception:
+                pass
+        return all_models
+
+    async def get_account_info(self) -> AccountInfo:
+        """Return account info from primary provider."""
+        return await self._provider_chain[0].get_account_info()
+
+    async def close(self) -> None:
+        """Close all underlying provider sessions in the chain."""
+        for prov in self._provider_chain:
+            await prov.close()
+
+
 class AIGateway:
     """Unified Gateway & Client for interacting with any configured AI provider.
 
     Usage Examples:
     --------------
     ```python
-    # 1. Direct generation with automatic .env configuration:
-    client = AIGateway(provider="openrouter")
-    response = await client.generate_text("Explique la théorie de la relativité.")
-    await client.close()
-
-    # 2. Check remaining budget & credits:
-    async with AIGateway("deepseek") as client:
-        info = await client.get_account_info()
-        print(f"Solde restant: ${info.total_balance}")
-
-    # 3. List available models & pricing:
+    # 1. Direct generation:
     async with AIGateway("gemini_free") as client:
-        models = await client.list_models()
-        for m in models:
-            print(m)
+        res = await client.generate_text("Bonjour !")
+
+    # 2. Real-time streaming:
+    async with AIGateway("openrouter") as client:
+        async for chunk in client.stream_text("Raconte une histoire courte."):
+            print(chunk, end="", flush=True)
+
+    # 3. Resilient Fallback Chain:
+    async with AIGateway.with_fallback(["gemini_free", "nvidia_free", "openrouter", "deepseek"]) as client:
+        res = await client.generate_text("Calculer pi avec 5 décimales.")
     ```
     """
 
@@ -133,6 +311,17 @@ class AIGateway:
             timeout=timeout,
             **kwargs,
         )
+
+    @classmethod
+    def with_fallback(
+        cls,
+        providers: list[ProviderType | str | BaseAIProvider],
+        *,
+        timeout: float = 60.0,
+        **kwargs: Any,
+    ) -> FallbackGateway:
+        """Create a resilient FallbackGateway that automatically fails over across providers."""
+        return FallbackGateway(providers=providers, timeout=timeout, **kwargs)
 
     @classmethod
     def available_providers(cls) -> list[str]:
@@ -215,6 +404,7 @@ class AIGateway:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate text using the underlying configured provider."""
@@ -224,6 +414,7 @@ class AIGateway:
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            json_mode=json_mode,
             **kwargs,
         )
 
@@ -234,10 +425,50 @@ class AIGateway:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Send chat messages using the underlying configured provider."""
         return await self.provider.chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+            **kwargs,
+        )
+
+    def stream_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated text chunks in real time."""
+        return self.provider.stream_text(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+
+    def stream_chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated chat chunks in real time."""
+        return self.provider.stream_chat(
             messages=messages,
             model=model,
             temperature=temperature,

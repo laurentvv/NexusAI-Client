@@ -5,6 +5,8 @@ Documentation: https://ai.google.dev/api/generate-content
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any, override
 
 import httpx
@@ -30,9 +32,11 @@ from nexusai_client.providers.base import BaseAIProvider
 class GeminiBaseProvider(BaseAIProvider):
     """Base provider implementing the Google Generative Language REST API."""
 
-    def _build_url(self, model: str) -> str:
-        """Construct the endpoint URL for generateContent."""
+    def _build_url(self, model: str, stream: bool = False) -> str:
+        """Construct the endpoint URL for generateContent or streamGenerateContent."""
         clean_model = model.removeprefix("models/")
+        if stream:
+            return f"{self.base_url}/models/{clean_model}:streamGenerateContent?alt=sse"
         return f"{self.base_url}/models/{clean_model}:generateContent"
 
     def _build_headers(self) -> dict[str, str]:
@@ -79,6 +83,7 @@ class GeminiBaseProvider(BaseAIProvider):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate response for a single text prompt."""
@@ -92,6 +97,7 @@ class GeminiBaseProvider(BaseAIProvider):
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            json_mode=json_mode,
             **kwargs,
         )
 
@@ -103,6 +109,7 @@ class GeminiBaseProvider(BaseAIProvider):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Send chat messages to Gemini REST API."""
@@ -114,6 +121,8 @@ class GeminiBaseProvider(BaseAIProvider):
         }
         if max_tokens is not None:
             generation_config["maxOutputTokens"] = max_tokens
+        if json_mode:
+            generation_config["responseMimeType"] = "application/json"
 
         payload: dict[str, Any] = {
             "contents": contents,
@@ -125,7 +134,7 @@ class GeminiBaseProvider(BaseAIProvider):
         payload.update(self.extra_params)
         payload.update(kwargs)
 
-        url = self._build_url(target_model)
+        url = self._build_url(target_model, stream=False)
         headers = self._build_headers()
         client = await self.get_client()
 
@@ -181,6 +190,93 @@ class GeminiBaseProvider(BaseAIProvider):
                 response_body=response.text,
                 message=f"Failed to parse Gemini response: {exc}",
             ) from exc
+
+    @override
+    async def stream_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated text from a prompt using Gemini SSE."""
+        messages: list[ChatMessage] = []
+        if system_prompt:
+            messages.append(ChatMessage(role="system", content=system_prompt))
+        messages.append(ChatMessage(role="user", content=prompt))
+
+        async for chunk in self.stream_chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        ):
+            yield chunk
+
+    @override
+    async def stream_chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated tokens in real time from Gemini API via SSE."""
+        target_model = model or self.default_model
+        system_instruction, contents = self._convert_messages_to_gemini(messages)
+
+        generation_config: dict[str, Any] = {
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            generation_config["maxOutputTokens"] = max_tokens
+
+        payload: dict[str, Any] = {
+            "contents": contents,
+            "generationConfig": generation_config,
+        }
+        if system_instruction:
+            payload["systemInstruction"] = system_instruction
+
+        payload.update(self.extra_params)
+        payload.update(kwargs)
+
+        url = self._build_url(target_model, stream=True)
+        headers = self._build_headers()
+        client = await self.get_client()
+
+        try:
+            async with client.stream("POST", url, headers=headers, json=payload) as response:
+                self._handle_http_error(response)
+
+                async for line in response.aiter_lines():
+                    clean_line = line.strip()
+                    if not clean_line or not clean_line.startswith("data:"):
+                        continue
+
+                    data_str = clean_line.removeprefix("data:").strip()
+                    try:
+                        chunk_json = json.loads(data_str)
+                        candidates = chunk_json.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            for part in parts:
+                                text_val = part.get("text")
+                                if text_val:
+                                    yield text_val
+                    except json.JSONDecodeError:
+                        continue
+
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+        except (httpx.NetworkError, httpx.ConnectError) as exc:
+            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
 
     @override
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:

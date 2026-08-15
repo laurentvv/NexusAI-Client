@@ -6,6 +6,8 @@ Handles providers adhering to the OpenAI Chat Completions standard
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any, override
 
 import httpx
@@ -56,6 +58,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate a response for a single text prompt."""
@@ -69,6 +72,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            json_mode=json_mode,
             **kwargs,
         )
 
@@ -80,6 +84,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Send a multi-turn chat conversation to the OpenAI-compatible endpoint."""
@@ -93,6 +98,8 @@ class OpenAICompatibleProvider(BaseAIProvider):
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
 
         payload.update(self.extra_params)
         payload.update(kwargs)
@@ -144,6 +151,90 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 response_body=response.text,
                 message=f"Failed to parse provider response: {exc}",
             ) from exc
+
+    @override
+    async def stream_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream real-time text chunks from a prompt."""
+        messages: list[ChatMessage] = []
+        if system_prompt:
+            messages.append(ChatMessage(role="system", content=system_prompt))
+        messages.append(ChatMessage(role="user", content=prompt))
+
+        async for chunk in self.stream_chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        ):
+            yield chunk
+
+    @override
+    async def stream_chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream real-time tokens from a conversation thread via Server-Sent Events (SSE)."""
+        target_model = model or self.default_model
+        normalized_messages = self._normalize_messages(messages)
+
+        payload: dict[str, Any] = {
+            "model": target_model,
+            "messages": normalized_messages,
+            "temperature": temperature,
+            "stream": True,
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+
+        payload.update(self.extra_params)
+        payload.update(kwargs)
+
+        headers = self._build_headers()
+        client = await self.get_client()
+
+        try:
+            async with client.stream("POST", self.chat_endpoint, headers=headers, json=payload) as response:
+                self._handle_http_error(response)
+
+                async for line in response.aiter_lines():
+                    clean_line = line.strip()
+                    if not clean_line or not clean_line.startswith("data:"):
+                        continue
+
+                    data_str = clean_line.removeprefix("data:").strip()
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        chunk_json = json.loads(data_str)
+                        choices = chunk_json.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue
+
+        except httpx.TimeoutException as exc:
+            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+        except (httpx.NetworkError, httpx.ConnectError) as exc:
+            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
 
     @override
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:

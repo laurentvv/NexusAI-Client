@@ -27,7 +27,7 @@ from nexusai_client.exceptions import (
     ProviderServerError,
     RateLimitError,
 )
-from nexusai_client.gateway import AIGateway
+from nexusai_client.gateway import AIGateway, FallbackGateway
 from nexusai_client.models import (
     AccountInfo,
     AIResponse,
@@ -36,6 +36,7 @@ from nexusai_client.models import (
     ModelInfo,
     ModelPricing,
     ProviderType,
+    StreamChunk,
     UsageInfo,
 )
 from nexusai_client.providers import (
@@ -55,10 +56,12 @@ __version__ = "0.1.0"
 __all__ = [
     # Gateway & Factory
     "AIGateway",
+    "FallbackGateway",
     # Enums & Models
     "ProviderType",
     "ChatMessage",
     "AIResponse",
+    "StreamChunk",
     "UsageInfo",
     "MessageRole",
     "ModelInfo",

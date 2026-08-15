@@ -67,6 +67,12 @@ class ModelPricing:
         cache_info = f" (Cache: ${self.cache_read_per_million:.2f}/1M)" if self.cache_read_per_million is not None else ""
         return f"Input: ${self.prompt_per_million:.2f}/1M | Output: ${self.completion_per_million:.2f}/1M{cache_info}"
 
+    def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
+        """Calculate total USD cost for given token usage."""
+        input_cost = (prompt_tokens / 1_000_000.0) * self.prompt_per_million
+        output_cost = (completion_tokens / 1_000_000.0) * self.completion_per_million
+        return input_cost + output_cost
+
 
 @dataclass(slots=True, kw_only=True)
 class ModelInfo:
@@ -134,3 +140,14 @@ class AIResponse:
 
     def __str__(self) -> str:
         return self.text
+
+
+@dataclass(slots=True, kw_only=True)
+class StreamChunk:
+    """A streaming text delta emitted by an active generation stream."""
+
+    text: str
+    provider: str
+    model: str
+    is_finished: bool = False
+    finish_reason: str | None = None

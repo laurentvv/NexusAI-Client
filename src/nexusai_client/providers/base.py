@@ -1,12 +1,13 @@
 """Base abstract class for all AI providers in NexusAI-Client.
 
 Defines the common asynchronous interface, HTTP connection management,
-model discovery, and account budget/quota inspection.
+model discovery, streaming, and account budget/quota inspection.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from typing import Any, Self
 
 import httpx
@@ -19,14 +20,20 @@ from nexusai_client.exceptions import (
     ProviderServerError,
     RateLimitError,
 )
-from nexusai_client.models import AccountInfo, AIResponse, ChatMessage, ModelInfo
+from nexusai_client.models import (
+    AccountInfo,
+    AIResponse,
+    ChatMessage,
+    ModelInfo,
+    StreamChunk,
+)
 
 
 class BaseAIProvider(ABC):
     """Abstract Base Class for all AI model providers.
 
-    All concrete providers implement the asynchronous `generate_text`, `chat`,
-    `list_models`, and `get_account_info` methods.
+    All concrete providers implement asynchronous generation, streaming, chat,
+    and model discovery.
     """
 
     def __init__(
@@ -63,6 +70,7 @@ class BaseAIProvider(ABC):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate a single text response from a prompt."""
@@ -76,9 +84,37 @@ class BaseAIProvider(ABC):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
         """Send a full conversation thread of messages to the model."""
+        ...
+
+    @abstractmethod
+    def stream_text(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated text tokens in real time from a prompt."""
+        ...
+
+    @abstractmethod
+    def stream_chat(
+        self,
+        messages: list[ChatMessage | dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream generated text tokens in real time from a multi-turn conversation."""
         ...
 
     @abstractmethod
@@ -88,11 +124,7 @@ class BaseAIProvider(ABC):
 
     @abstractmethod
     async def get_account_info(self) -> AccountInfo:
-        """Fetch remaining account balance, credit limits, usage, or quota information.
-
-        Returns:
-            AccountInfo: Structured descriptor of budget, limits, and free tier status.
-        """
+        """Fetch remaining account balance, credit limits, usage, or quota information."""
         ...
 
     # ---------------------------------------------------------

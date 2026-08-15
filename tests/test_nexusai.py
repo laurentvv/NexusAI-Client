@@ -19,6 +19,7 @@ from nexusai_client import (
     ChatMessage,
     Config,
     DeepSeekProvider,
+    FallbackGateway,
     GeminiFreeProvider,
     GeminiProProvider,
     MissingAPIKeyError,
@@ -110,6 +111,45 @@ def test_available_providers() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fallback_gateway_success_first_attempt() -> None:
+    """Test FallbackGateway succeeds on primary provider."""
+    p1 = AIGateway.create("gemini_free", api_key="test-key")
+    p2 = AIGateway.create("openrouter", api_key="test-key")
+
+    mock_resp = AIResponse(text="Success from P1", provider="gemini_free", model="gemini-2.5-flash")
+    with patch.object(p1, "generate_text", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(p2, "generate_text", new_callable=AsyncMock) as mock_p2:
+            gateway = FallbackGateway([p1, p2])
+            res = await gateway.generate_text("Test prompt")
+            assert res.text == "Success from P1"
+            mock_p2.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fallback_gateway_fails_over_to_second() -> None:
+    """Test FallbackGateway fails over to secondary when primary fails."""
+    p1 = AIGateway.create("gemini_free", api_key="test-key")
+    p2 = AIGateway.create("openrouter", api_key="test-key")
+
+    mock_resp_p2 = AIResponse(text="Success from P2", provider="openrouter", model="openrouter/free")
+    with patch.object(
+        p1,
+        "generate_text",
+        side_effect=RateLimitError(
+            provider="gemini_free",
+            status_code=429,
+            response_body="Quota exceeded",
+            message="Quota",
+        ),
+    ):
+        with patch.object(p2, "generate_text", new_callable=AsyncMock, return_value=mock_resp_p2):
+            gateway = FallbackGateway([p1, p2])
+            res = await gateway.generate_text("Test prompt")
+            assert res.text == "Success from P2"
+            assert res.provider == "openrouter"
+
+
+@pytest.mark.asyncio
 async def test_deepseek_account_balance_mocked() -> None:
     """Test DeepSeek get_account_info method."""
     mock_payload = {
@@ -168,7 +208,7 @@ async def test_openrouter_account_info_mocked() -> None:
             info = await client.get_account_info()
             assert isinstance(info, AccountInfo)
             assert info.total_usage == 1.25
-            assert info.total_balance == 8.75  # 10.0 - 1.25
+            assert info.total_balance == 8.75
             assert "Solde restant: $8.75" in info.format_summary()
 
 
@@ -202,7 +242,6 @@ async def test_list_models_openrouter_mocked() -> None:
         with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response
 
-            # All models
             all_models = await client.list_models()
             assert len(all_models) == 2
             assert all_models[0].is_free is True
@@ -210,7 +249,6 @@ async def test_list_models_openrouter_mocked() -> None:
             assert all_models[1].pricing is not None
             assert all_models[1].pricing.prompt_per_million == 2.5
 
-            # Free only
             free_models = await client.list_models(free_only=True)
             assert len(free_models) == 1
             assert free_models[0].id == "google/gemini-2.0-flash-exp:free"
