@@ -324,6 +324,69 @@ class AIGateway:
         return FallbackGateway(providers=providers, timeout=timeout, **kwargs)
 
     @classmethod
+    def get_configured_providers(cls, *, prioritize_free: bool = True) -> list[str]:
+        """Dynamically inspect environment and return all providers with valid API keys.
+
+        Args:
+            prioritize_free: If True (default), places zero-cost / free-tier providers
+                             at the front of the chain, followed by paid fallback providers.
+
+        Returns:
+            List of configured provider strings (e.g. ['gemini_free', 'nvidia_free', 'openrouter', 'deepseek']).
+        """
+        free_candidates = ["gemini_free", "nvidia_free", "openrouter", "mistral"]
+        paid_candidates = ["deepseek", "gemini_pro"]
+
+        configured_free: list[str] = []
+        configured_paid: list[str] = []
+
+        for p_name in free_candidates:
+            try:
+                prov = cls.create(p_name)
+                if prov.api_key:
+                    configured_free.append(p_name)
+            except (MissingAPIKeyError, Exception):
+                pass
+
+        for p_name in paid_candidates:
+            try:
+                prov = cls.create(p_name)
+                if prov.api_key:
+                    configured_paid.append(p_name)
+            except (MissingAPIKeyError, Exception):
+                pass
+
+        if prioritize_free:
+            return configured_free + configured_paid
+        return configured_paid + configured_free
+
+    @classmethod
+    def auto_fallback(
+        cls,
+        *,
+        prioritize_free: bool = True,
+        timeout: float = 60.0,
+        **kwargs: Any,
+    ) -> FallbackGateway:
+        """Automatically create a FallbackGateway composed of all active providers in .env.
+
+        Example:
+        -------
+        ```python
+        async with AIGateway.auto_fallback() as client:
+            res = await client.generate_text("Hello!")
+        ```
+        """
+        chain = cls.get_configured_providers(prioritize_free=prioritize_free)
+        if not chain:
+            raise MissingAPIKeyError(
+                provider="Any",
+                env_var="At least one valid API key in .env",
+                message="No configured AI providers found in .env to build a fallback chain.",
+            )
+        return cls.with_fallback(chain, timeout=timeout, **kwargs)
+
+    @classmethod
     def available_providers(cls) -> list[str]:
         """Return a sorted list of unique supported provider names."""
         unique_names = {

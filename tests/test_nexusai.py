@@ -150,6 +150,27 @@ async def test_fallback_gateway_fails_over_to_second() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_configured_providers_and_auto_fallback() -> None:
+    """Test dynamic chain generation and auto_fallback."""
+    with patch.dict(
+        os.environ,
+        {
+            "GEMINI_FREE_API_KEY": "test-gemini-key",
+            "DEEPSEEK_API_KEY": "test-deepseek-key",
+        },
+        clear=True,
+    ):
+        chain = AIGateway.get_configured_providers(prioritize_free=True)
+        assert "gemini_free" in chain
+        assert "deepseek" in chain
+        assert chain.index("gemini_free") < chain.index("deepseek")
+
+        auto_gateway = AIGateway.auto_fallback()
+        assert isinstance(auto_gateway, FallbackGateway)
+        assert len(auto_gateway._provider_chain) >= 2
+
+
+@pytest.mark.asyncio
 async def test_deepseek_account_balance_mocked() -> None:
     """Test DeepSeek get_account_info method."""
     mock_payload = {
