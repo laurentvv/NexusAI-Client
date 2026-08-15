@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import ClassVar, Final
+from typing import Final
 
 from dotenv import find_dotenv, load_dotenv
 
-from nexusai_client.exceptions import MissingAPIKeyError
+from nexusai_client.exceptions import MissingAPIKeyError, ProviderNotFoundError
 from nexusai_client.models import ProviderType
 
 # Auto-load environment variables from the nearest .env file
@@ -57,6 +57,118 @@ class ProviderDefaults:
     DEFAULT_TIMEOUT: Final[float] = 60.0
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class _ProviderMeta:
+    name: str
+    env_key: str
+    default_base_url: str
+    default_model: str
+    fallback_env_key: str | None = None
+    env_base_url_var: str | None = None
+    env_model_var: str | None = None
+
+
+_PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
+    # DeepSeek
+    "deepseek": _ProviderMeta(
+        name="DeepSeek",
+        env_key=ProviderDefaults.DEEPSEEK_ENV_KEY,
+        default_base_url=ProviderDefaults.DEEPSEEK_BASE_URL,
+        default_model=ProviderDefaults.DEEPSEEK_MODEL,
+        env_base_url_var="DEEPSEEK_BASE_URL",
+        env_model_var="DEEPSEEK_DEFAULT_MODEL",
+    ),
+    # Gemini Pro
+    "gemini_pro": _ProviderMeta(
+        name="Gemini Pro",
+        env_key=ProviderDefaults.GEMINI_PRO_ENV_KEY,
+        default_base_url=ProviderDefaults.GEMINI_PRO_BASE_URL,
+        default_model=ProviderDefaults.GEMINI_PRO_MODEL,
+        fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
+        env_base_url_var="GEMINI_PRO_BASE_URL",
+        env_model_var="GEMINI_PRO_DEFAULT_MODEL",
+    ),
+    # Gemini Free
+    "gemini_free": _ProviderMeta(
+        name="Gemini Free",
+        env_key=ProviderDefaults.GEMINI_FREE_ENV_KEY,
+        default_base_url=ProviderDefaults.GEMINI_FREE_BASE_URL,
+        default_model=ProviderDefaults.GEMINI_FREE_MODEL,
+        fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
+        env_base_url_var="GEMINI_FREE_BASE_URL",
+        env_model_var="GEMINI_FREE_DEFAULT_MODEL",
+    ),
+    "gemini": _ProviderMeta(
+        name="Gemini Free",
+        env_key=ProviderDefaults.GEMINI_FREE_ENV_KEY,
+        default_base_url=ProviderDefaults.GEMINI_FREE_BASE_URL,
+        default_model=ProviderDefaults.GEMINI_FREE_MODEL,
+        fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
+        env_base_url_var="GEMINI_FREE_BASE_URL",
+        env_model_var="GEMINI_FREE_DEFAULT_MODEL",
+    ),
+    # Mistral
+    "mistral": _ProviderMeta(
+        name="Mistral",
+        env_key=ProviderDefaults.MISTRAL_ENV_KEY,
+        default_base_url=ProviderDefaults.MISTRAL_BASE_URL,
+        default_model=ProviderDefaults.MISTRAL_MODEL,
+        env_base_url_var="MISTRAL_BASE_URL",
+        env_model_var="MISTRAL_DEFAULT_MODEL",
+    ),
+    "mistral_free": _ProviderMeta(
+        name="Mistral",
+        env_key=ProviderDefaults.MISTRAL_ENV_KEY,
+        default_base_url=ProviderDefaults.MISTRAL_BASE_URL,
+        default_model=ProviderDefaults.MISTRAL_MODEL,
+        env_base_url_var="MISTRAL_BASE_URL",
+        env_model_var="MISTRAL_DEFAULT_MODEL",
+    ),
+    # Nvidia NIM
+    "nvidia": _ProviderMeta(
+        name="Nvidia",
+        env_key=ProviderDefaults.NVIDIA_ENV_KEY,
+        default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
+        default_model=ProviderDefaults.NVIDIA_MODEL,
+        env_base_url_var="NVIDIA_BASE_URL",
+        env_model_var="NVIDIA_DEFAULT_MODEL",
+    ),
+    "nvidia_free": _ProviderMeta(
+        name="Nvidia",
+        env_key=ProviderDefaults.NVIDIA_ENV_KEY,
+        default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
+        default_model=ProviderDefaults.NVIDIA_MODEL,
+        env_base_url_var="NVIDIA_BASE_URL",
+        env_model_var="NVIDIA_DEFAULT_MODEL",
+    ),
+    "nvidia_nim": _ProviderMeta(
+        name="Nvidia",
+        env_key=ProviderDefaults.NVIDIA_ENV_KEY,
+        default_base_url=ProviderDefaults.NVIDIA_BASE_URL,
+        default_model=ProviderDefaults.NVIDIA_MODEL,
+        env_base_url_var="NVIDIA_BASE_URL",
+        env_model_var="NVIDIA_DEFAULT_MODEL",
+    ),
+    # OpenRouter
+    "openrouter": _ProviderMeta(
+        name="OpenRouter",
+        env_key=ProviderDefaults.OPENROUTER_ENV_KEY,
+        default_base_url=ProviderDefaults.OPENROUTER_BASE_URL,
+        default_model=ProviderDefaults.OPENROUTER_MODEL,
+        env_base_url_var="OPENROUTER_BASE_URL",
+        env_model_var="OPENROUTER_DEFAULT_MODEL",
+    ),
+    "openrouter_free": _ProviderMeta(
+        name="OpenRouter",
+        env_key=ProviderDefaults.OPENROUTER_ENV_KEY,
+        default_base_url=ProviderDefaults.OPENROUTER_BASE_URL,
+        default_model=ProviderDefaults.OPENROUTER_MODEL,
+        env_base_url_var="OPENROUTER_BASE_URL",
+        env_model_var="OPENROUTER_DEFAULT_MODEL",
+    ),
+}
+
+
 @dataclass(slots=True, kw_only=True)
 class ProviderConfig:
     """Resolved configuration for an AI Provider instance."""
@@ -84,20 +196,7 @@ class Config:
         provider_name: str = "Unknown",
         required: bool = True,
     ) -> str:
-        """Retrieve an API key from environment variables.
-
-        Args:
-            env_var: Primary environment variable name.
-            fallback_var: Optional secondary environment variable name.
-            provider_name: Human-friendly provider name for error messages.
-            required: If True, raises MissingAPIKeyError if neither var is set.
-
-        Returns:
-            The resolved API key string.
-
-        Raises:
-            MissingAPIKeyError: If key is not found and required is True.
-        """
+        """Retrieve an API key from environment variables."""
         key = os.getenv(env_var) or (os.getenv(fallback_var) if fallback_var else None)
         if not key or not key.strip():
             if required:
@@ -116,105 +215,42 @@ class Config:
         timeout: float | None = None,
         require_api_key: bool = True,
     ) -> ProviderConfig:
-        """Resolve full configuration for a specific provider.
+        """Resolve full configuration for a specific provider via table lookup."""
+        norm = str(provider).lower().replace("-", "_").strip()
+        meta = _PROVIDER_META_REGISTRY.get(norm)
 
-        User-provided arguments always take precedence over environment variables
-        and default constants.
-        """
-        norm = str(provider).lower().replace("-", "_")
+        if meta is None:
+            raise ProviderNotFoundError(
+                provider=str(provider),
+                available_providers=[p.value for p in ProviderType],
+            )
+
         env_timeout = os.getenv("NEXUS_DEFAULT_TIMEOUT")
         resolved_timeout = timeout if timeout is not None else (
             float(env_timeout) if env_timeout else ProviderDefaults.DEFAULT_TIMEOUT
         )
 
-        match norm:
-            case ProviderType.DEEPSEEK | "deepseek":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.DEEPSEEK_ENV_KEY,
-                    provider_name="DeepSeek",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("DEEPSEEK_BASE_URL", ProviderDefaults.DEEPSEEK_BASE_URL),
-                    default_model=model or os.getenv("DEEPSEEK_DEFAULT_MODEL", ProviderDefaults.DEEPSEEK_MODEL),
-                    timeout=resolved_timeout,
-                )
+        resolved_key = api_key or cls.get_api_key(
+            meta.env_key,
+            fallback_var=meta.fallback_env_key,
+            provider_name=meta.name,
+            required=require_api_key,
+        )
 
-            case ProviderType.GEMINI_PRO | "gemini_pro" | "gemini-pro":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.GEMINI_PRO_ENV_KEY,
-                    fallback_var=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
-                    provider_name="Gemini Pro",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("GEMINI_PRO_BASE_URL", ProviderDefaults.GEMINI_PRO_BASE_URL),
-                    default_model=model or os.getenv("GEMINI_PRO_DEFAULT_MODEL", ProviderDefaults.GEMINI_PRO_MODEL),
-                    timeout=resolved_timeout,
-                )
+        env_base = os.getenv(meta.env_base_url_var) if meta.env_base_url_var else None
+        env_model = os.getenv(meta.env_model_var) if meta.env_model_var else None
 
-            case ProviderType.GEMINI_FREE | "gemini_free" | "gemini-free" | "gemini":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.GEMINI_FREE_ENV_KEY,
-                    fallback_var=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
-                    provider_name="Gemini Free",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("GEMINI_FREE_BASE_URL", ProviderDefaults.GEMINI_FREE_BASE_URL),
-                    default_model=model or os.getenv("GEMINI_FREE_DEFAULT_MODEL", ProviderDefaults.GEMINI_FREE_MODEL),
-                    timeout=resolved_timeout,
-                )
+        extra_headers: dict[str, str] | None = None
+        if "openrouter" in norm:
+            extra_headers = {
+                "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://github.com/NexusAI-Client"),
+                "X-Title": os.getenv("OPENROUTER_APP_NAME", "NexusAI-Client"),
+            }
 
-            case ProviderType.MISTRAL | "mistral" | "mistral_free" | "mistral-free":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.MISTRAL_ENV_KEY,
-                    provider_name="Mistral",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("MISTRAL_BASE_URL", ProviderDefaults.MISTRAL_BASE_URL),
-                    default_model=model or os.getenv("MISTRAL_DEFAULT_MODEL", ProviderDefaults.MISTRAL_MODEL),
-                    timeout=resolved_timeout,
-                )
-
-            case ProviderType.NVIDIA | ProviderType.NVIDIA_FREE | "nvidia" | "nvidia_free" | "nvidia-free" | "nvidia_nim" | "nvidia-nim":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.NVIDIA_ENV_KEY,
-                    provider_name="Nvidia",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("NVIDIA_BASE_URL", ProviderDefaults.NVIDIA_BASE_URL),
-                    default_model=model or os.getenv("NVIDIA_DEFAULT_MODEL", ProviderDefaults.NVIDIA_MODEL),
-                    timeout=resolved_timeout,
-                )
-
-            case ProviderType.OPENROUTER | ProviderType.OPENROUTER_FREE | "openrouter" | "openrouter_free" | "openrouter-free":
-                resolved_key = api_key or cls.get_api_key(
-                    ProviderDefaults.OPENROUTER_ENV_KEY,
-                    provider_name="OpenRouter",
-                    required=require_api_key,
-                )
-                return ProviderConfig(
-                    api_key=resolved_key,
-                    base_url=base_url or os.getenv("OPENROUTER_BASE_URL", ProviderDefaults.OPENROUTER_BASE_URL),
-                    default_model=model or os.getenv("OPENROUTER_DEFAULT_MODEL", ProviderDefaults.OPENROUTER_MODEL),
-                    timeout=resolved_timeout,
-                    extra_headers={
-                        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://github.com/NexusAI-Client"),
-                        "X-Title": os.getenv("OPENROUTER_APP_NAME", "NexusAI-Client"),
-                    },
-                )
-
-            case _:
-                from nexusai_client.exceptions import ProviderNotFoundError
-                raise ProviderNotFoundError(
-                    provider=str(provider),
-                    available_providers=[p.value for p in ProviderType],
-                )
+        return ProviderConfig(
+            api_key=resolved_key,
+            base_url=base_url or env_base or meta.default_base_url,
+            default_model=model or env_model or meta.default_model,
+            timeout=resolved_timeout,
+            extra_headers=extra_headers,
+        )

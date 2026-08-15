@@ -65,7 +65,7 @@ class NvidiaProvider(OpenAICompatibleProvider):
                     is_free=True,
                     context_length=128_000 if "llama-3" in m.id or "deepseek" in m.id else 32_000,
                     pricing=free_pricing,
-                    description=f"Modèle hébergé sur Nvidia NIM (Accès gratuit avec crédits NGC).",
+                    description="Modèle hébergé sur Nvidia NIM (Accès gratuit avec crédits NGC).",
                     raw_data=m.raw_data,
                 )
             )

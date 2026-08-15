@@ -13,9 +13,7 @@ from typing import Any, Self
 import httpx
 
 from nexusai_client.exceptions import (
-    APIConnectionError,
     APIResponseError,
-    APITimeoutError,
     AuthenticationError,
     ProviderServerError,
     RateLimitError,
@@ -25,7 +23,6 @@ from nexusai_client.models import (
     AIResponse,
     ChatMessage,
     ModelInfo,
-    StreamChunk,
 )
 
 
@@ -152,9 +149,9 @@ class BaseAIProvider(ABC):
 
     async def __aexit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: Any,
     ) -> None:
         """Async context manager exit point."""
         await self.close()

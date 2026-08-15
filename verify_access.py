@@ -22,7 +22,6 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         pass
 
 from nexusai_client import (
-    AccountInfo,
     AIGateway,
     AuthenticationError,
     MissingAPIKeyError,
