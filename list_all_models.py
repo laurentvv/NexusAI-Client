@@ -1,14 +1,11 @@
-"""Script utilitaire pour lister, filtrer et exporter le catalogue de modèles disponibles.
+"""CLI utility to explore, filter, and export the live model catalog across providers.
 
-Permet de visualiser tous les modèles supportés par fournisseur avec leurs
-caractéristiques (gratuit / payant, fenêtre de contexte, tarifs, description).
-
-Exemples d'utilisation :
-    uv run python list_all_models.py                  # Affiche le récapitulatif complet
-    uv run python list_all_models.py --free           # Affiche uniquement les modèles gratuits
-    uv run python list_all_models.py --provider nvidia # Filtre par fournisseur
-    uv run python list_all_models.py --search llama   # Recherche par mot-clé
-    uv run python list_all_models.py --export models.json # Exporte le catalogue complet en JSON
+Usage examples:
+    uv run python list_all_models.py                  # Display full summary
+    uv run python list_all_models.py --free           # Filter free-tier models only
+    uv run python list_all_models.py --provider nvidia # Filter by provider
+    uv run python list_all_models.py --search llama   # Search by keyword
+    uv run python list_all_models.py --export models.json # Export complete catalog to JSON
 """
 
 from __future__ import annotations
@@ -20,7 +17,7 @@ import sys
 from dataclasses import asdict
 from typing import Any
 
-# Assure le support UTF-8 sous Windows
+# Ensure UTF-8 output on Windows
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -31,28 +28,28 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
 from nexusai_client import AIGateway, ModelInfo
 
 PROVIDERS = [
-    ("deepseek", "1. DeepSeek (API Payante)"),
-    ("gemini_free", "2. Google Gemini (Tier Gratuit AI Studio)"),
-    ("gemini_pro", "3. Google Gemini (Tier Payant Pro)"),
-    ("mistral", "4. Mistral AI (La Plateforme)"),
-    ("nvidia_free", "5. Nvidia NIM (Tier Gratuit NGC)"),
-    ("openrouter", "6. OpenRouter (Multi-Fournisseurs)"),
+    ("deepseek", "1. DeepSeek (Paid API)"),
+    ("gemini_free", "2. Google Gemini (Google AI Studio Free Tier)"),
+    ("gemini_pro", "3. Google Gemini (Paid Pro Tier)"),
+    ("mistral", "4. Mistral AI (Platform)"),
+    ("nvidia_free", "5. Nvidia NIM (Free Tier NGC)"),
+    ("openrouter", "6. OpenRouter (Multi-Provider Hub)"),
 ]
 
 
 async def fetch_provider_models(provider_id: str, free_only: bool) -> tuple[str, list[ModelInfo]]:
-    """Récupère la liste des modèles pour un fournisseur donné."""
+    """Fetch model list for a given provider."""
     try:
         async with AIGateway(provider=provider_id) as client:
             models = await client.list_models(free_only=free_only)
             return provider_id, models
     except Exception as e:
-        print(f"⚠️ Erreur lors de la récupération pour '{provider_id}' : {e}", file=sys.stderr)
+        print(f"⚠️ Error fetching models for '{provider_id}': {e}", file=sys.stderr)
         return provider_id, []
 
 
 def _filter_models(models: list[ModelInfo], search_term: str | None) -> list[ModelInfo]:
-    """Filtre les modèles selon un mot-clé de recherche."""
+    """Filter models by search keyword."""
     if not search_term:
         return models
     s = search_term.lower()
@@ -63,65 +60,65 @@ def _filter_models(models: list[ModelInfo], search_term: str | None) -> list[Mod
 
 
 def _display_models_table(label: str, models: list[ModelInfo], limit: int) -> None:
-    """Affiche le tableau récapitulatif des modèles pour un fournisseur."""
+    """Display tabular model breakdown for a provider."""
     free_count = sum(1 for m in models if m.is_free)
     paid_count = len(models) - free_count
 
     print(f"\n📁 {label}")
-    print(f"   Total disponible : {len(models)} ({free_count} gratuits, {paid_count} payants)")
+    print(f"   Available Models: {len(models)} ({free_count} free, {paid_count} paid)")
     print("-" * 80)
 
     if not models:
-        print("   (Aucun modèle correspondant aux critères)")
+        print("   (No matching models found)")
         return
 
-    print(f"   {'Identifiant (Model ID)':<40} | {'Contexte':<10} | {'Tarif / Statut'}")
+    print(f"   {'Model Identifier (ID)':<40} | {'Context':<10} | {'Pricing / Status'}")
     print("   " + "-" * 75)
 
     for m in models[:limit]:
         ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
-        cost = m.pricing.format_pricing() if m.pricing else ("🟢 Gratuit" if m.is_free else "💳 Payant standard")
+        cost = m.pricing.format_pricing() if m.pricing else ("🟢 Free" if m.is_free else "💳 Standard Paid")
         badge = "🟢 " if m.is_free else "💳 "
         print(f"   {badge}{m.id:<38} | {ctx:<10} | {cost}")
 
     if len(models) > limit:
-        print(f"   ... et {len(models) - limit} autres modèles (utilisez --limit 50 ou --search pour affiner)")
+        print(f"   ... and {len(models) - limit} more models (use --limit 50 or --search to refine)")
 
 
 def _export_to_json(filepath: str, data: dict[str, Any]) -> None:
-    """Exporte le dictionnaire de données au format JSON."""
+    """Export data dictionary to a JSON file."""
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"💾 Catalogue exporté avec succès vers '{filepath}' !")
+    print(f"💾 Catalog successfully exported to '{filepath}'!")
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Construit et configure le parseur d'arguments CLI."""
-    parser = argparse.ArgumentParser(description="NexusAI-Client - Explorateur de Modèles")
-    parser.add_argument("--free", action="store_true", help="Afficher uniquement les modèles gratuits")
-    parser.add_argument("--provider", type=str, default=None, help="Filtrer par fournisseur")
-    parser.add_argument("--search", type=str, default=None, help="Rechercher par mot-clé")
-    parser.add_argument("--export", type=str, default=None, help="Exporter en fichier JSON")
-    parser.add_argument("--limit", type=int, default=15, help="Nombre max de modèles affichés (défaut: 15)")
+    """Configure CLI argument parser."""
+    parser = argparse.ArgumentParser(description="NexusAI-Client - Model Catalog Explorer")
+    parser.add_argument("--free", action="store_true", help="Display free-tier models only")
+    parser.add_argument("--provider", type=str, default=None, help="Filter by provider")
+    parser.add_argument("--search", type=str, default=None, help="Search by keyword")
+    parser.add_argument("--export", type=str, default=None, help="Export catalog to JSON file")
+    parser.add_argument("--limit", type=int, default=15, help="Max models displayed per provider (default: 15)")
     return parser
 
 
 async def main() -> None:
-    """Point d'entrée principal de l'explorateur de modèles."""
+    """Main CLI entry point for model explorer."""
     parser = _build_parser()
     args = parser.parse_args()
 
     target_providers = [p for p in PROVIDERS if not args.provider or p[0] == args.provider.lower()]
     if not target_providers:
-        print(f"❌ Fournisseur inconnu : '{args.provider}'. Disponibles : {[p[0] for p in PROVIDERS]}")
+        print(f"❌ Unknown provider: '{args.provider}'. Available: {[p[0] for p in PROVIDERS]}")
         return
 
     print("=" * 80)
-    print("🤖 NEXUSAI-CLIENT - CATALOGUE DES MODÈLES DISPONIBLES")
+    print("🤖 NEXUSAI-CLIENT - LIVE MODEL CATALOG EXPLORER")
     if args.free:
-        print("🎯 Filtre : Modèles Gratuits Uniquement")
+        print("🎯 Filter: Free-Tier Models Only")
     if args.search:
-        print(f"🔍 Recherche : '{args.search}'")
+        print(f"🔍 Search: '{args.search}'")
     print("=" * 80)
 
     tasks = [fetch_provider_models(p_id, args.free) for p_id, _ in target_providers]
@@ -148,7 +145,7 @@ async def main() -> None:
         _display_models_table(label, models, args.limit)
 
     print("\n" + "=" * 80)
-    print(f"✅ Total : {total_models_found} modèles disponibles répertoriés.")
+    print(f"✅ Total: {total_models_found} models indexed across active providers.")
     print("=" * 80)
 
     if args.export:

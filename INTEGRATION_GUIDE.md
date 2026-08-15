@@ -1,80 +1,78 @@
-# 📦 Guide d'Intégration de NexusAI-Client dans vos Projets
+# 📦 NexusAI-Client Integration Guide
 
-Ce guide explique étape par étape comment intégrer et consommer **NexusAI-Client** en tant que bibliothèque / module centralisé dans un autre projet Python (Application Web, API FastAPI, Agent IA, Bot, Worker, Script d'automatisation).
-
----
-
-## 📑 Sommaire
-
-1. [Installation dans votre Projet](#1-installation-dans-votre-projet)
-2. [Configuration des Variables d'Environnement](#2-configuration-des-variables-denvironnement)
-3. [Exemples de Fonctions Métier Prêtes à l'Emploi](#3-exemples-de-fonctions-métier-prêtes-à-lemploi)
-   - [A. Fonction de génération de texte simple](#a-fonction-de-génération-de-texte-simple)
-   - [B. Fonction avec Fallback automatique Multi-Providers](#b-fonction-avec-fallback-automatique-multi-providers)
-   - [C. Fonction de Chat Conversationnel avec Historique](#c-fonction-de-chat-conversationnel-avec-historique)
-   - [D. Fonction de Génération de Code (Spécialisée)](#d-fonction-de-génération-de-code-spécialisée)
-   - [E. Fonction d'Audit et de Découverte des Modèles Gratuits](#e-fonction-daudit-et-de-découverte-des-modèles-gratuits)
-4. [Intégration dans une API FastAPI](#4-intégration-dans-une-api-fastapi)
-5. [Gestion des Exceptions et Bonnes Pratiques](#5-gestion-des-exceptions-et-bonnes-pratiques)
+This guide explains how to integrate and consume **NexusAI-Client** as a centralized library within your Python projects (Web Applications, FastAPI / Flask backends, Autonomous AI Agents, Chatbots, Background Workers, and CLI tools).
 
 ---
 
-## 1. Installation dans votre Projet
+## 📑 Table of Contents
 
-### Option A : Depuis le dossier local (Mode Développement / Monorepo)
+1. [Installation in Your Project](#1-installation-in-your-project)
+2. [Environment Configuration](#2-environment-configuration)
+3. [Ready-to-Use Functional Recipes](#3-ready-to-use-functional-recipes)
+   - [A. Generic Single-Prompt Function](#a-generic-single-prompt-function)
+   - [B. Resilient Automatic Multi-Provider Fallback](#b-resilient-automatic-multi-provider-fallback)
+   - [C. Stateful Multi-Turn Chat Session](#c-stateful-multi-turn-chat-session)
+   - [D. Specialized Code Generation](#d-specialized-code-generation)
+   - [E. Real-Time Free Models Discovery](#e-real-time-free-models-discovery)
+4. [FastAPI Endpoint Integration](#4-fastapi-endpoint-integration)
+5. [Exception Handling & Best Practices](#5-exception-handling--best-practices)
 
-Si `NexusAI-Client` est sur votre machine :
+---
+
+## 1. Installation in Your Project
+
+### Option A: From local path (Development / Monorepo)
 
 ```bash
-# Avec uv (Recommandé)
-uv add --editable /chemin/vers/NexusAI-Client
+# With uv (Recommended)
+uv add --editable /path/to/NexusAI-Client
 
-# Avec pip
-pip install -e /chemin/vers/NexusAI-Client
+# With pip
+pip install -e /path/to/NexusAI-Client
 ```
 
-### Option B : Depuis un dépôt Git
+### Option B: From Git Repository
 
 ```bash
-# Avec uv
-uv add git+https://github.com/votre-compte/NexusAI-Client.git
+# With uv
+uv add git+https://github.com/laurentvv/NexusAI-Client.git
 
-# Avec pip
-pip install git+https://github.com/votre-compte/NexusAI-Client.git
+# With pip
+pip install git+https://github.com/laurentvv/NexusAI-Client.git
 ```
 
-### Option C : Dans votre `pyproject.toml`
+### Option C: In your `pyproject.toml`
 
 ```toml
 [project]
 dependencies = [
-    "nexusai-client @ file:///D:/GIT/NexusAI-Client",
+    "nexusai-client @ git+https://github.com/laurentvv/NexusAI-Client.git",
 ]
 ```
 
 ---
 
-## 2. Configuration des Variables d'Environnement
+## 2. Environment Configuration
 
-Dans le fichier `.env` de votre application principale, renseignez les clés des fournisseurs que vous souhaitez utiliser :
+In your application's `.env` file, specify the API keys for the providers you want to use:
 
 ```env
-# Fournisseurs Gratuits
-GEMINI_FREE_API_KEY=votre_cle_google_ai_studio
-MISTRAL_API_KEY=votre_cle_mistral
-NVIDIA_API_KEY=nvapi-votre_cle_nvidia
-OPENROUTER_API_KEY=sk-or-v1-votre_cle_openrouter
+# Free Tiers
+GEMINI_FREE_API_KEY=your_google_ai_studio_key
+MISTRAL_API_KEY=your_mistral_api_key
+NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
+OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
 
-# Fournisseurs Payants (Optionnels)
-DEEPSEEK_API_KEY=sk-votre_cle_deepseek
-GEMINI_PRO_API_KEY=votre_cle_gemini_pro
+# Paid Tiers (Optional)
+DEEPSEEK_API_KEY=sk-your_deepseek_key
+GEMINI_PRO_API_KEY=your_gemini_pro_key
 ```
 
 ---
 
-## 3. Exemples de Fonctions Métier Prêtes à l'Emploi
+## 3. Ready-to-Use Functional Recipes
 
-### A. Fonction de génération de texte simple
+### A. Generic Single-Prompt Function
 
 ```python
 import asyncio
@@ -86,7 +84,7 @@ async def ask_ai(
     system_prompt: str | None = None,
     temperature: float = 0.3,
 ) -> str:
-    """Interroge un modèle d'IA et retourne le texte généré."""
+    """Send a prompt to any supported AI provider and return the generated text."""
     async with AIGateway(provider=provider) as client:
         response = await client.generate_text(
             prompt=prompt,
@@ -95,14 +93,14 @@ async def ask_ai(
         )
         return response.text
 
-# --- Exemple d'appel ---
+# --- Example Usage ---
 async def main():
-    reponse = await ask_ai(
-        prompt="Donne-moi 3 idées de noms pour une application de météo.",
-        system_prompt="Tu es un expert en branding créatif.",
-        provider="gemini_free", # ou "nvidia_free", "mistral", "openrouter", "deepseek"
+    reply = await ask_ai(
+        prompt="Suggest 3 catchy domain names for an AI analytics platform.",
+        system_prompt="You are a creative branding expert.",
+        provider="gemini_free", # or "nvidia_free", "mistral", "openrouter", "deepseek"
     )
-    print(reponse)
+    print(reply)
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -110,47 +108,36 @@ if __name__ == "__main__":
 
 ---
 
-### B. Fonction avec Fallback automatique Multi-Providers
+### B. Resilient Automatic Multi-Provider Fallback
 
-Si un fournisseur gratuit est saturé (HTTP 429) ou indisponible, la requête bascule instantanément sur le suivant :
+If a free provider is rate-limited (HTTP 429) or unreachable, automatically failover to the next provider in the chain:
 
 ```python
 import asyncio
 import logging
-from nexusai_client import AIGateway, NexusAIError, RateLimitError, APITimeoutError
+from nexusai_client import AIGateway, NexusAIError
 
 logger = logging.getLogger(__name__)
 
-# Chaîne de secours : Gemini Free -> Nvidia NIM -> OpenRouter -> DeepSeek (Payant)
-FALLBACK_PROVIDERS = ["gemini_free", "nvidia_free", "openrouter", "deepseek"]
+# Fallback order: Gemini Free -> Nvidia NIM -> OpenRouter -> DeepSeek (Paid)
+PROVIDER_CHAIN = ["gemini_free", "nvidia_free", "openrouter", "deepseek"]
 
-async def ask_ai_with_fallback(
-    prompt: str,
-    system_prompt: str | None = None,
-    providers: list[str] = FALLBACK_PROVIDERS,
-) -> tuple[str, str]:
-    """Tente d'appeler les providers dans l'ordre de la liste jusqu'à réussite.
+async def ask_ai_with_fallback(prompt: str, system_prompt: str | None = None) -> tuple[str, str]:
+    """Attempt generation across providers in priority order until success.
     
-    Retourne (texte_genere, provider_ayant_reussi).
+    Returns (generated_text, successful_provider_name).
     """
-    for provider in providers:
-        try:
-            async with AIGateway(provider=provider, timeout=15.0) as client:
-                response = await client.generate_text(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                )
-                return response.text, provider
-        except (RateLimitError, APITimeoutError, NexusAIError) as err:
-            logger.warning(f"⚠️ Échec sur '{provider}' ({err}). Bascule sur le suivant...")
-            continue
+    async with AIGateway.with_fallback(PROVIDER_CHAIN, timeout=15.0) as client:
+        response = await client.generate_text(
+            prompt=prompt,
+            system_prompt=system_prompt,
+        )
+        return response.text, response.provider
 
-    raise RuntimeError("❌ Tous les fournisseurs configurés ont échoué.")
-
-# --- Exemple d'appel ---
+# --- Example Usage ---
 async def main():
-    texte, provider = await ask_ai_with_fallback("Résume la théorie du Big Bang.")
-    print(f"✅ Réponse obtenue via [{provider}] :\n{texte}")
+    text, provider = await ask_ai_with_fallback("Explain the concept of quantum entanglement.")
+    print(f"✅ Succeeded via [{provider}]:\n{text}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -158,41 +145,39 @@ if __name__ == "__main__":
 
 ---
 
-### C. Fonction de Chat Conversationnel avec Historique
+### C. Stateful Multi-Turn Chat Session
 
 ```python
 import asyncio
 from nexusai_client import AIGateway, ChatMessage
 
 class AIChatSession:
-    """Gestionnaire de session de chat avec mémoire conversationnelle."""
+    """Manages an ongoing multi-turn conversation with memory."""
 
-    def __init__(self, provider: str = "openrouter", system_prompt: str = "Tu es un assistant utile.") -> None:
+    def __init__(self, provider: str = "openrouter", system_prompt: str = "You are a helpful assistant.") -> None:
         self.provider = provider
         self.history: list[ChatMessage] = [
             ChatMessage(role="system", content=system_prompt)
         ]
 
     async def send_message(self, user_text: str) -> str:
-        """Ajoute le message utilisateur, interroge l'IA et mémorise la réponse."""
+        """Append user message, query AI, and store assistant reply."""
         self.history.append(ChatMessage(role="user", content=user_text))
 
         async with AIGateway(self.provider) as client:
             response = await client.chat(messages=self.history)
-            
-            # Sauvegarder la réponse de l'assistant dans l'historique
             self.history.append(ChatMessage(role="assistant", content=response.text))
             return response.text
 
-# --- Exemple de dialogue interactif ---
+# --- Example Interactive Dialogue ---
 async def main():
-    chat = AIChatSession(provider="mistral", system_prompt="Tu es un tuteur Python.")
+    chat = AIChatSession(provider="mistral", system_prompt="You are a Python programming tutor.")
     
-    rep1 = await chat.send_message("Comment créer un dictionnaire en Python ?")
+    rep1 = await chat.send_message("How do I initialize an empty dictionary in Python?")
     print(f"Assistant: {rep1}\n")
 
-    rep2 = await chat.send_message("Comment y ajouter une nouvelle clé ?")
-    print(f"Assistant (avec contexte): {rep2}")
+    rep2 = await chat.send_message("How do I add a key to it?")
+    print(f"Assistant (with context): {rep2}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -200,28 +185,28 @@ if __name__ == "__main__":
 
 ---
 
-### D. Fonction de Génération de Code (Spécialisée)
+### D. Specialized Code Generation
 
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def generate_python_code(task_description: str) -> str:
-    """Utilise Codestral (Mistral) pour générer du code propre et documenté."""
-    system = "Tu es un ingénieur logiciel Senior. Réponds uniquement avec du code Python propre, typé et testable."
+    """Use Codestral (Mistral) for production-grade, typed, and clean Python code."""
+    system = "You are a Principal Software Engineer. Provide clean, typed, PEP 8 compliant code with docstrings."
     
     async with AIGateway("mistral") as client:
         response = await client.generate_text(
-            prompt=f"Écris le code pour : {task_description}",
+            prompt=f"Task: {task_description}",
             system_prompt=system,
-            model="codestral-latest", # Modèle spécialisé code
+            model="codestral-latest", # Specialized coding model
             temperature=0.1,
         )
         return response.text
 
-# --- Exemple d'appel ---
+# --- Example Usage ---
 async def main():
-    code = await generate_python_code("un décorateur de retry avec backoff exponentiel")
+    code = await generate_python_code("an asynchronous rate limiter with leaky bucket algorithm")
     print(code)
 
 if __name__ == "__main__":
@@ -230,22 +215,22 @@ if __name__ == "__main__":
 
 ---
 
-### E. Fonction d'Audit et de Découverte des Modèles Gratuits
+### E. Real-Time Free Models Discovery
 
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
-async def get_free_models_summary() -> list[dict[str, str]]:
-    """Récupère la liste de tous les modèles gratuits disponibles en temps réel."""
-    free_models_list: list[dict[str, str]] = []
+async def get_all_free_models() -> list[dict[str, str]]:
+    """Fetch live list of all active free-tier models across providers."""
+    free_models: list[dict[str, str]] = []
     
     for prov in ["gemini_free", "mistral", "nvidia_free", "openrouter"]:
         try:
             async with AIGateway(prov) as client:
                 models = await client.list_models(free_only=True)
                 for m in models:
-                    free_models_list.append({
+                    free_models.append({
                         "provider": prov,
                         "id": m.id,
                         "name": m.name,
@@ -254,14 +239,14 @@ async def get_free_models_summary() -> list[dict[str, str]]:
         except Exception:
             continue
             
-    return free_models_list
+    return free_models
 
-# --- Exemple d'appel ---
+# --- Example Usage ---
 async def main():
-    models = await get_free_models_summary()
-    print(f"🔍 {len(models)} modèles gratuits disponibles :")
+    models = await get_all_free_models()
+    print(f"🔍 Found {len(models)} active free models:")
     for m in models[:5]:
-        print(f" - [{m['provider']}] {m['id']} (Contexte: {m['context']})")
+        print(f" - [{m['provider']}] {m['id']} (Context: {m['context']})")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -269,16 +254,14 @@ if __name__ == "__main__":
 
 ---
 
-## 4. Intégration dans une API FastAPI
-
-Voici comment brancher `NexusAI-Client` dans une route HTTP asynchrone :
+## 4. FastAPI Endpoint Integration
 
 ```python
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from nexusai_client import AIGateway, NexusAIError, RateLimitError
 
-app = FastAPI(title="Mon API d'IA")
+app = FastAPI(title="AI Gateway Microservice")
 
 class GenerationRequest(BaseModel):
     prompt: str
@@ -308,51 +291,49 @@ async def generate_text_endpoint(req: GenerationRequest):
                 tokens_used=res.usage.total_tokens if res.usage else None,
             )
     except RateLimitError as e:
-        raise HTTPException(status_code=429, detail=f"Quota dépassé : {e.message}")
+        raise HTTPException(status_code=429, detail=f"Rate limit exceeded: {e.message}")
     except NexusAIError as e:
-        raise HTTPException(status_code=500, detail=f"Erreur IA : {e.message}")
+        raise HTTPException(status_code=500, detail=f"AI Provider error: {e.message}")
 
-# Lancement : uvicorn main:app --reload
+# Run with: uvicorn main:app --reload
 ```
 
 ---
 
-## 5. Gestion des Exceptions et Bonnes Pratiques
-
-Toutes les exceptions sont fortement typées :
+## 5. Exception Handling & Best Practices
 
 ```python
 from nexusai_client import (
     AIGateway,
     NexusAIError,
-    MissingAPIKeyError,    # Clé absente dans le .env
-    AuthenticationError,   # Clé invalide (HTTP 401 / 403)
-    RateLimitError,        # Quota ou débit dépassé (HTTP 429)
-    APITimeoutError,       # Timeout réseau
-    APIConnectionError,    # Serveur distant injoignable
-    ProviderNotFoundError, # Nom de provider inconnu
+    MissingAPIKeyError,    # Missing API key in .env
+    AuthenticationError,   # Invalid or expired key (HTTP 401/403)
+    RateLimitError,        # Quota or rate limit reached (HTTP 429)
+    APITimeoutError,       # Network timeout
+    APIConnectionError,    # Remote host unreachable
+    ProviderNotFoundError, # Unrecognized provider name
 )
 
 try:
     async with AIGateway("deepseek") as client:
-        response = await client.generate_text("Bonjour !")
+        response = await client.generate_text("Hello!")
 except MissingAPIKeyError as e:
-    print(f"⚠️ Configuration manquante : {e.env_var}")
+    print(f"⚠️ Missing configuration: {e.env_var}")
 except RateLimitError:
-    print("⏳ Trop de requêtes, basculer sur un autre fournisseur !")
+    print("⏳ Rate limit exceeded, fallback to secondary provider!")
 except NexusAIError as e:
-    print(f"❌ Erreur générique : {e.message}")
+    print(f"❌ Generic NexusAI error: {e.message}")
 ```
 
 ---
 
-## 💡 Tableau Récapitulatif des Identifiants Providers
+## 💡 Provider Identifiers Quick Reference
 
-| Nom dans `AIGateway("...")` | Fournisseur | Tier | Modèle par défaut |
+| Identifier in `AIGateway("...")` | Provider | Tier | Default Model |
 | :--- | :--- | :--- | :--- |
-| `"gemini_free"` | Google AI Studio | Gratuit | `gemini-2.5-flash` |
-| `"gemini_pro"` | Google AI Studio Pro | Payant | `gemini-2.5-pro` |
-| `"nvidia_free"` (ou `"nvidia"`) | Nvidia NIM | Gratuit (1 000 crédits) | `meta/llama-3.1-8b-instruct` |
-| `"openrouter"` | OpenRouter | Gratuit (`:free`) & Payant | `openrouter/free` |
-| `"mistral"` | Mistral AI | Gratuit & Payant | `mistral-small-latest` |
-| `"deepseek"` | DeepSeek | Payant | `deepseek-chat` |
+| `"gemini_free"` | Google AI Studio | Free | `gemini-2.5-flash` |
+| `"gemini_pro"` | Google AI Studio Pro | Paid | `gemini-2.5-pro` |
+| `"nvidia_free"` (or `"nvidia"`) | Nvidia NIM | Free (1,000 credits) | `meta/llama-3.1-8b-instruct` |
+| `"openrouter"` | OpenRouter | Free (`:free`) & Paid | `openrouter/free` |
+| `"mistral"` | Mistral AI | Free & Paid | `mistral-small-latest` |
+| `"deepseek"` | DeepSeek | Paid | `deepseek-chat` |

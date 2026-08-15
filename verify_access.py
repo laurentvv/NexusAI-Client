@@ -1,8 +1,8 @@
-"""Script de validation et de test pour tous les fournisseurs NexusAI-Client.
+"""Access validation and diagnostic benchmark for NexusAI-Client.
 
-Vérifie la configuration du .env, interroge le budget / solde restant,
-liste les modèles disponibles (gratuits / payants et coûts associés)
-et effectue un appel de test réel pour valider la connectivité.
+Verifies .env configuration, queries live account balances/quotas,
+retrieves the model catalog (free vs paid with per-1M token costs),
+and performs a live inference test to benchmark latency.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-# Assure l'encodage UTF-8 sous Windows
+# Ensure UTF-8 output encoding on Windows platforms
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -32,13 +32,13 @@ from nexusai_client import (
 PROVIDERS_TO_TEST = [
     {
         "id": "deepseek",
-        "name": "1. DeepSeek (API Payante)",
+        "name": "1. DeepSeek (Paid API)",
         "env_key": "DEEPSEEK_API_KEY",
         "is_paid": True,
     },
     {
         "id": "gemini_pro",
-        "name": "2. Google Gemini Pro (Tier Payant)",
+        "name": "2. Google Gemini Pro (Paid Tier)",
         "env_key": "GEMINI_PRO_API_KEY",
         "is_paid": True,
     },
@@ -50,19 +50,19 @@ PROVIDERS_TO_TEST = [
     },
     {
         "id": "mistral",
-        "name": "4. Mistral AI (Tier Gratuit / La Plateforme)",
+        "name": "4. Mistral AI (Free Tier / Platform)",
         "env_key": "MISTRAL_API_KEY",
         "is_paid": False,
     },
     {
         "id": "nvidia_free",
-        "name": "5. Nvidia NIM (Tier Gratuit / NGC)",
+        "name": "5. Nvidia NIM (Free Tier / NGC)",
         "env_key": "NVIDIA_API_KEY",
         "is_paid": False,
     },
     {
         "id": "openrouter",
-        "name": "6. OpenRouter (Tier Gratuit / Modèles :free)",
+        "name": "6. OpenRouter (Free Tier / :free Models)",
         "env_key": "OPENROUTER_API_KEY",
         "is_paid": False,
     },
@@ -82,75 +82,73 @@ class ProviderTestResult:
 
 
 async def test_single_provider(item: dict[str, Any]) -> ProviderTestResult:
-    """Exécute la vérification complète pour un fournisseur donné."""
+    """Execute complete validation suite for a given provider."""
     p_id = item["id"]
     p_name = item["name"]
 
     print("\n" + "=" * 75)
-    print(f"🔍 Test de connexion : {p_name}")
+    print(f"🔍 Connection Test : {p_name}")
     print("=" * 75)
 
     try:
         async with AIGateway(provider=p_id) as client:
-            print(f"🔑 Clé API détectée pour '{p_id}'.")
+            print(f"🔑 API Key detected for '{p_id}'.")
 
-            # 1. Vérification du budget / solde restant / quotas
-            print("💰 Récupération des informations de budget et quotas...")
+            # 1. Budget & Quota Inspection
+            print("💰 Fetching account balance and rate limits...")
             budget_str = "N/A"
             try:
                 acc_info = await client.get_account_info()
                 budget_str = acc_info.format_summary()
-                print(f"  💵 Statut Compte : {budget_str}")
+                print(f"  💵 Account Status : {budget_str}")
             except Exception as e:
-                print(f"  ⚠️ Impossible de récupérer les crédits : {e}")
+                print(f"  ⚠️ Could not fetch balance/quota: {e}")
 
-            # 2. Récupération du catalogue des modèles
-            print("\n📋 Récupération du catalogue de modèles...")
+            # 2. Model Catalog Discovery
+            print("\n📋 Fetching model catalog...")
             try:
                 models = await client.list_models()
                 free_models = [m for m in models if m.is_free]
                 paid_models = [m for m in models if not m.is_free]
 
-                print(f"  📊 Modèles disponibles : {len(models)} total ({len(free_models)} gratuits, {len(paid_models)} payants)")
+                print(f"  📊 Available Models : {len(models)} total ({len(free_models)} free, {len(paid_models)} paid)")
 
-                # Affichage des modèles gratuits
                 if free_models:
-                    print("  🟢 Exemples de modèles gratuits :")
+                    print("  🟢 Sample Free Models :")
                     for m in free_models[:4]:
                         ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
-                        print(f"     • {m.id:<35} | Contexte: {ctx:<6} | {m.name}")
+                        print(f"     • {m.id:<35} | Context: {ctx:<6} | {m.name}")
 
-                # Affichage des modèles payants avec coûts
                 if paid_models:
-                    print("  💳 Exemples de modèles payants & coûts :")
+                    print("  💳 Sample Paid Models & Pricing :")
                     for m in paid_models[:4]:
-                        cost = m.pricing.format_pricing() if m.pricing else "Tarif standard"
+                        cost = m.pricing.format_pricing() if m.pricing else "Standard rate"
                         ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
-                        print(f"     • {m.id:<30} | Contexte: {ctx:<6} | {cost}")
+                        print(f"     • {m.id:<30} | Context: {ctx:<6} | {cost}")
 
             except Exception as e:
-                print(f"  ⚠️ Impossible de lister les modèles : {e}")
+                print(f"  ⚠️ Could not list models: {e}")
                 models = []
 
-            # 3. Test d'inférence réel
-            print(f"\n🚀 Test d'inférence en direct ({client.provider.default_model})...")
+            # 3. Live Inference Benchmark
+            print(f"\n🚀 Live inference benchmark ({client.provider.default_model})...")
             start_t = time.perf_counter()
             response = await client.generate_text(
-                prompt="Réponds uniquement 'Test réussi' en 2 mots.",
+                prompt="Reply with exactly 2 words: 'Test Successful'.",
                 temperature=0.1,
                 max_tokens=20,
             )
             elapsed_ms = (time.perf_counter() - start_t) * 1000
 
-            print(f"  ✅ Succès ! Latence : {elapsed_ms:.1f}ms")
-            print(f"  💬 Réponse : \"{response.text.strip()}\"")
+            print(f"  ✅ Success! Latency : {elapsed_ms:.1f}ms")
+            print(f"  💬 Output : \"{response.text.strip()}\"")
             if response.usage:
                 print(f"  🔢 Tokens : {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
 
             return ProviderTestResult(
                 provider_id=p_id,
                 name=p_name,
-                status="✅ OPÉRATIONNEL",
+                status="✅ OPERATIONAL",
                 budget_info=budget_str,
                 latency_ms=elapsed_ms,
                 models_count=len(models),
@@ -158,53 +156,53 @@ async def test_single_provider(item: dict[str, Any]) -> ProviderTestResult:
             )
 
     except MissingAPIKeyError as e:
-        print(f"⚠️  Clé manquante : {e.message}")
+        print(f"⚠️  Missing Key : {e.message}")
         return ProviderTestResult(
             provider_id=p_id,
             name=p_name,
-            status="⚠️ CLÉ MANQUANTE",
-            error_message=f"Renseignez {item['env_key']} dans .env",
+            status="⚠️ MISSING KEY",
+            error_message=f"Set {item['env_key']} in .env",
         )
     except AuthenticationError as e:
-        print(f"❌ Authentification échouée (HTTP {e.status_code}) : {e.message}")
+        print(f"❌ Authentication Failed (HTTP {e.status_code}) : {e.message}")
         return ProviderTestResult(
             provider_id=p_id,
             name=p_name,
-            status="❌ AUTH INVALIDE",
-            error_message="Clé API expirée ou rejetée",
+            status="❌ INVALID AUTH",
+            error_message="Invalid or expired API key",
         )
     except RateLimitError as e:
-        print(f"⏳ Quota dépassé (HTTP 429) : {e.message}")
+        print(f"⏳ Rate Limit Exceeded (HTTP 429) : {e.message}")
         return ProviderTestResult(
             provider_id=p_id,
             name=p_name,
-            status="⏳ QUOTA DÉPASSÉ",
-            error_message="Limite de requêtes atteinte",
+            status="⏳ RATE LIMITED",
+            error_message="Quota or rate limit reached",
         )
     except NexusAIError as e:
-        print(f"❌ Erreur API : {e.message}")
+        print(f"❌ API Error : {e.message}")
         return ProviderTestResult(
             provider_id=p_id,
             name=p_name,
-            status="❌ ERREUR API",
+            status="❌ API ERROR",
             error_message=str(e)[:40],
         )
     except Exception as e:
-        print(f"❌ Erreur inattendue : {e}")
+        print(f"❌ Unexpected Error : {e}")
         return ProviderTestResult(
             provider_id=p_id,
             name=p_name,
-            status="❌ ERREUR",
+            status="❌ ERROR",
             error_message=str(e)[:40],
         )
 
 
 async def main() -> None:
-    """Exécution globale de la validation."""
+    """Run full diagnostic validation across all 6 providers."""
     print("=" * 75)
-    print("🤖 NEXUSAI-CLIENT - VÉRIFICATION DES ACCÈS, BUDGETS & MODÈLES")
+    print("🤖 NEXUSAI-CLIENT - ACCESS, BUDGET & MODEL VALIDATION SUITE")
     print("=" * 75)
-    print("Ce script teste la configuration de votre fichier .env pour les 6 fournisseurs.")
+    print("Testing environment configuration across all 6 supported AI providers.")
 
     results: list[ProviderTestResult] = []
 
@@ -212,11 +210,11 @@ async def main() -> None:
         res = await test_single_provider(item)
         results.append(res)
 
-    # Tableau Récapitulatif Final
+    # Final Summary Table
     print("\n\n" + "=" * 90)
-    print("📊 TABLEAU RÉCAPITULATIF DES ACCÈS & BUDGETS")
+    print("📊 PROVIDER ACCESS & BUDGET SUMMARY")
     print("=" * 90)
-    print(f"{'Fournisseur':<28} | {'Statut':<16} | {'Budget / Quota':<30} | {'Latence'}")
+    print(f"{'Provider':<28} | {'Status':<16} | {'Budget / Quota':<30} | {'Latency'}")
     print("-" * 90)
 
     for r in results:
@@ -225,7 +223,7 @@ async def main() -> None:
         print(f"{r.name:<28} | {r.status:<16} | {budget_disp:<30} | {lat_str}")
 
     print("=" * 90)
-    print("💡 Conseil : Pour activer un fournisseur, ajoutez sa clé dans le fichier .env")
+    print("💡 Tip: To enable a provider, add its corresponding API key to your .env file.")
 
 
 if __name__ == "__main__":

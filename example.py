@@ -1,9 +1,9 @@
-"""Exemple d'utilisation de NexusAI-Client.
+"""NexusAI-Client Usage Demonstration.
 
-Démontre comment :
-1. Consulter le budget / solde restant / quotas par provider
-2. Lister les modèles disponibles (gratuits vs payants et coûts)
-3. Exécuter un appel asynchrone à OpenRouter et Gemini Free avec gestion d'erreurs.
+Demonstrates:
+1. Checking account balance / remaining credits / quotas per provider
+2. Discovering available models (free vs paid and pricing)
+3. Performing asynchronous inference and streaming with OpenRouter and Gemini Free.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
-# Assure le support de l'encodage UTF-8 pour l'affichage console sous Windows
+# Ensure UTF-8 output encoding on Windows
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -28,52 +28,50 @@ from nexusai_client import (
 
 
 async def demonstrate_account_info_and_models() -> None:
-    """Démonstration de la consultation des budgets et catalogues de modèles."""
+    """Demonstrate querying balances and model catalogs."""
     print("\n" + "=" * 65)
-    print("💳 1. VÉRIFICATION DU BUDGET & DES MODÈLES (OpenRouter & DeepSeek)")
+    print("💳 1. CHECKING BUDGET & MODEL CATALOGS (OpenRouter & Gemini)")
     print("=" * 65)
 
-    # Consultation du compte OpenRouter
     try:
         async with AIGateway(provider="openrouter") as client:
             info = await client.get_account_info()
-            print(f"📊 OpenRouter Statut : {info.format_summary()}")
+            print(f"📊 OpenRouter Status: {info.format_summary()}")
 
-            # Lister les modèles gratuits
             free_models = await client.list_models(free_only=True)
-            print(f"🟢 Modèles gratuits trouvés ({len(free_models)}) :")
+            print(f"🟢 Free models found ({len(free_models)}):")
             for m in free_models[:3]:
-                print(f"   • {m.id} (Contexte: {m.context_length} tokens)")
+                print(f"   • {m.id} (Context: {m.context_length} tokens)")
 
     except MissingAPIKeyError as e:
-        print(f"ℹ️ OpenRouter non configuré : {e.message}")
+        print(f"ℹ️ OpenRouter not configured: {e.message}")
     except NexusAIError as e:
-        print(f"⚠️ Erreur OpenRouter : {e}")
+        print(f"⚠️ OpenRouter Error: {e}")
 
 
 async def demonstrate_openrouter_call() -> None:
-    """Démonstration d'un appel asynchrone vers OpenRouter (Tier Gratuit)."""
+    """Demonstrate async inference call with OpenRouter."""
     print("\n" + "=" * 65)
-    print("🤖 2. TEST APPEL IA OPENROUTER (Tier Gratuit)")
+    print("🤖 2. OPENROUTER AI INFERENCE (Free Tier)")
     print("=" * 65)
 
-    prompt = "Explique en 2 phrases simples le principe de la mécanique quantique."
+    prompt = "Explain quantum mechanics in 2 simple sentences."
 
     try:
         async with AIGateway(provider="openrouter") as client:
-            print(f"👉 Envoi de la requête à OpenRouter ({client.provider.default_model})...")
+            print(f"👉 Sending request to OpenRouter ({client.provider.default_model})...")
             response = await client.generate_text(
                 prompt=prompt,
-                system_prompt="Tu es un professeur de vulgarisation scientifique bienveillant et concis.",
+                system_prompt="You are an expert science educator.",
                 temperature=0.5,
             )
 
-            print("\n✅ Réponse reçue :")
-            print(f"Modèle utilisé  : {response.model}")
-            print(f"Provider        : {response.provider}")
+            print("\n✅ Response Received:")
+            print(f"Model used     : {response.model}")
+            print(f"Provider       : {response.provider}")
             if response.usage:
                 print(
-                    f"Tokens consommés: {response.usage.total_tokens} "
+                    f"Tokens consumed: {response.usage.total_tokens} "
                     f"(prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})"
                 )
             print("-" * 65)
@@ -81,65 +79,43 @@ async def demonstrate_openrouter_call() -> None:
             print("-" * 65)
 
     except MissingAPIKeyError as e:
-        print(f"⚠️  Clé manquante : {e.message}")
-        print("💡 Astuce : Renseignez 'OPENROUTER_API_KEY' dans votre fichier .env")
+        print(f"⚠️  Missing Key: {e.message}")
     except NexusAIError as e:
-        print(f"❌ Erreur NexusAI : {e}")
+        print(f"❌ NexusAI Error: {e}")
 
 
-async def demonstrate_gemini_free() -> None:
-    """Démonstration d'un appel asynchrone vers Google Gemini Free (Google AI Studio)."""
+async def demonstrate_gemini_streaming() -> None:
+    """Demonstrate real-time token streaming with Google Gemini Free."""
     print("\n" + "=" * 65)
-    print("✨ 3. TEST APPEL IA GEMINI FREE (Google AI Studio)")
+    print("✨ 3. GEMINI FREE REAL-TIME TOKEN STREAMING (Google AI Studio)")
     print("=" * 65)
-
-    conversation = [
-        ChatMessage(role="system", content="Tu es un assistant expert en architecture logicielle Python."),
-        ChatMessage(role="user", content="Quels sont les 3 avantages principaux de l'asynchronisme avec httpx ?"),
-    ]
 
     try:
         async with AIGateway(provider="gemini_free") as client:
-            # Récupérer les quotas du compte
             info = await client.get_account_info()
-            print(f"📊 Gemini Quotas : {info.format_summary()}")
+            print(f"📊 Gemini Quotas: {info.format_summary()}")
 
-            print(f"👉 Envoi de la conversation à Gemini Free ({client.provider.default_model})...")
-            response = await client.chat(
-                messages=conversation,
-                temperature=0.3,
-                max_tokens=500,
-            )
-
-            print("\n✅ Réponse reçue :")
-            print(f"Modèle utilisé  : {response.model}")
-            print(f"Provider        : {response.provider}")
-            if response.usage:
-                print(
-                    f"Tokens consommés: {response.usage.total_tokens} "
-                    f"(prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})"
-                )
-            print("-" * 65)
-            print(response.text)
-            print("-" * 65)
+            print(f"👉 Streaming response from Gemini ({client.provider.default_model}):\n")
+            async for chunk in client.stream_text("Name 3 key architectural advantages of asyncio in Python."):
+                print(chunk, end="", flush=True)
+            print("\n" + "-" * 65)
 
     except MissingAPIKeyError as e:
-        print(f"⚠️  Clé manquante : {e.message}")
-        print("💡 Astuce : Renseignez 'GEMINI_FREE_API_KEY' ou 'GEMINI_API_KEY' dans votre .env")
+        print(f"⚠️  Missing Key: {e.message}")
     except NexusAIError as e:
-        print(f"❌ Erreur NexusAI : {e}")
+        print(f"❌ NexusAI Error: {e}")
 
 
 async def main() -> None:
-    """Point d'entrée principal de l'exemple."""
-    print("🚀 Démarrage de la démonstration NexusAI-Client")
+    """Main demonstration entry point."""
+    print("🚀 Starting NexusAI-Client Demonstration")
     print(f"Python Version: {sys.version.split()[0]}")
 
     await demonstrate_account_info_and_models()
     await demonstrate_openrouter_call()
-    await demonstrate_gemini_free()
+    await demonstrate_gemini_streaming()
 
-    print("\n🎉 Démonstration terminée !")
+    print("\n🎉 Demonstration complete!")
 
 
 if __name__ == "__main__":

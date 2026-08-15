@@ -5,8 +5,8 @@
 # NexusAI-Client ⚡
 
 <p align="center">
-  <strong>Passerelle IA asynchrone unifiée, ultra-légère et typée pour Python 3.14.</strong><br>
-  <em>Unifiez DeepSeek, Google Gemini (Free & Pro), Mistral, Nvidia NIM et OpenRouter sous une interface unique sans SDKs lourds.</em>
+  <strong>An ultra-lightweight, strictly-typed, asynchronous Python 3.14 gateway for multi-provider AI APIs.</strong><br>
+  <em>Unify DeepSeek, Google Gemini (Free & Pro), Mistral, Nvidia NIM, and OpenRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
 </p>
 
 <p align="center">
@@ -20,120 +20,147 @@
 
 ---
 
-## 💡 Pourquoi NexusAI-Client ?
+## 💡 Why NexusAI-Client?
 
-Intégrer plusieurs fournisseurs d'IA dans une application moderne impose généralement d'installer **5 ou 6 SDKs propriétaires distincts** (`google-genai`, `openai`, `mistralai`, etc.). Cela engendre des dizaines de dépendances transitives, des conflits de versions, une empreinte mémoire lourde et du code hétérogène difficile à maintenir.
+Integrating multiple AI providers in modern Python applications usually requires installing **5 or 6 separate proprietary SDKs** (`google-genai`, `openai`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
 
-**NexusAI-Client** résout ce problème à la racine :
-- 🪶 **Zéro Dépendance Lourde** : Uniquement propulsé par `httpx` et `python-dotenv`.
-- ⚡ **Asynchronisme & Streaming SSE Natif** : Streaming token par token en temps réel via `stream_text()` et `stream_chat()`.
-- 🔄 **Smart Fallback Gateway** : Bascule automatique en cas de quota dépassé (HTTP 429) ou de panne (`AIGateway.with_fallback(...)`).
-- 🎯 **Sorties JSON Structurées** : Mode `json_mode=True` natif garanti par tous les fournisseurs.
-- 💰 **Découverte du Budget & des Quotas en Direct** : Interroge en temps réel les soldes restants (USD, crédits NGC) et les limites (RPM, TPM, RPD).
-- 🔍 **Catalogue de 640+ Modèles en Direct** : Découverte automatique des modèles gratuits (`:free`, tiers gratuits) et tarification au million de tokens.
+**NexusAI-Client** solves this at the core:
+- 🪶 **Zero Heavyweight Dependencies**: Powered purely by `httpx` and `python-dotenv`.
+- ⚡ **Native Asynchronous & SSE Streaming**: Stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
+- 🔄 **Smart Fallback Gateway**: Automatic failover across free and paid providers when rate limits (HTTP 429) or outages occur.
+- 🎯 **Guaranteed JSON Outputs**: Native `json_mode=True` across all supported providers.
+- 💰 **Live Account & Budget Inspection**: Inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
+- 🔍 **640+ Models Discovered Live**: Automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
 
 ---
 
 ## 🏛️ Architecture
 
 ```
-                             ┌──► 🟣 DeepSeek (V3 / R1 Reasoner - Solde USD en direct)
-                             ├──► 🟡 Google Gemini Free (Google AI Studio - 1M tokens de contexte)
-                             ├──► 🔵 Google Gemini Pro (Tier Payant GCP)
-     [Votre Application] ──► AIGateway ─┼──► 🟠 Mistral AI (Codestral / Small / Large)
-                             ├──► 🟢 Nvidia NIM (1 000 crédits offerts / Llama 3.3 70B)
-                             └──► ⚪ OpenRouter (Routeur auto openrouter/free & 400+ modèles)
+                             ┌──► 🟣 DeepSeek (V3 / R1 Reasoner - Live USD Balance)
+                             ├──► 🟡 Google Gemini Free (Google AI Studio - 1M Token Context)
+                             ├──► 🔵 Google Gemini Pro (Paid GCP Tier)
+     [Your Python App] ──► AIGateway ─┼──► 🟠 Mistral AI (Codestral / Small / Large)
+                             ├──► 🟢 Nvidia NIM (1,000 Free Credits / Llama 3.3 70B)
+                             └──► ⚪ OpenRouter (Auto-Router openrouter/free & 400+ Models)
 ```
 
 ---
 
-## 🎯 Matrice des Fournisseurs Supportés
+## 🎯 Supported Providers Matrix
 
-| Fournisseur | Identifiant (`provider`) | Tier | Protocole | Modèle par défaut | Détection Budget & Quotas |
+| Provider | Identifier (`provider`) | Tier | Protocol | Default Model | Live Budget & Quota Detection |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **DeepSeek** | `"deepseek"` | Payant | OpenAI Chat API | `deepseek-chat` | Solde USD en temps réel (`GET /user/balance`) |
-| **Gemini Free** | `"gemini_free"` | Gratuit (AI Studio) | Gemini REST | `gemini-2.5-flash` | Quotas : 15 RPM \| 1M TPM \| 1 500 RPD |
-| **Gemini Pro** | `"gemini_pro"` | Payant | Gemini REST | `gemini-2.5-pro` | Facturation Google Cloud Pay-as-you-go |
-| **Mistral AI** | `"mistral"` | Gratuit / Plateforme | OpenAI Chat API | `mistral-small-latest` | Modèles gratuits (`codestral-latest`, etc.) |
-| **Nvidia NIM** | `"nvidia_free"` | Gratuit (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1 000 crédits d'inférence gratuits NGC |
-| **OpenRouter** | `"openrouter"` | Gratuit & Payant | OpenAI Chat API | `openrouter/free` | 19 modèles gratuits en direct + 390 payants |
+| **DeepSeek** | `"deepseek"` | Paid | OpenAI Chat API | `deepseek-chat` | Real-time USD Balance (`GET /user/balance`) |
+| **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-2.5-flash` | Quotas: 15 RPM \| 1M TPM \| 1,500 RPD |
+| **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-2.5-pro` | Google Cloud Pay-as-you-go Billing |
+| **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
+| **Nvidia NIM** | `"nvidia_free"` | Free (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1,000 Free GPU Inference Credits (NGC) |
+| **OpenRouter** | `"openrouter"` | Free & Paid | OpenAI Chat API | `openrouter/free` | 19 Free models live + 390 Commercial models |
 
 ---
 
-## 🚀 Démarrage Rapide (1 Minute)
+## 🚀 Quickstart (1 Minute)
 
 ### 1. Installation
 
 ```bash
-# Avec uv (Recommandé)
+# With uv (Recommended)
 uv add git+https://github.com/laurentvv/NexusAI-Client.git
 
-# En mode local / éditable
-uv add --editable /chemin/vers/NexusAI-Client
+# Local / Editable mode
+uv add --editable /path/to/NexusAI-Client
 ```
 
-### 2. Configuration des Clés (`.env`)
+### 2. Configure API Keys (`.env`)
 
-Créez un fichier `.env` à la racine de votre projet :
+Create a `.env` file at the root of your project:
 
 ```env
-# Fournisseurs Gratuits
-GEMINI_FREE_API_KEY=votre_cle_google_ai_studio
-MISTRAL_API_KEY=votre_cle_mistral_la_plateforme
-NVIDIA_API_KEY=nvapi-votre_cle_nvidia_nim
-OPENROUTER_API_KEY=sk-or-v1-votre_cle_openrouter
+# Free Tiers
+GEMINI_FREE_API_KEY=your_google_ai_studio_key
+MISTRAL_API_KEY=your_mistral_api_key
+NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
+OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
 
-# Fournisseurs Payants (Optionnels)
-DEEPSEEK_API_KEY=sk-votre_cle_deepseek
-GEMINI_PRO_API_KEY=votre_cle_gemini_pro
+# Paid Tiers (Optional)
+DEEPSEEK_API_KEY=sk-your_deepseek_key
+GEMINI_PRO_API_KEY=your_gemini_pro_key
 ```
 
-### 3. Exemples d'Utilisation
+### 3. Basic Generation in 3 Lines of Code
 
-#### A. Génération Simple
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def main():
     async with AIGateway("gemini_free") as client:
-        response = await client.generate_text("Explique la théorie de la relativité en 2 phrases.")
+        response = await client.generate_text("Explain the theory of relativity in 2 sentences.")
         print(response.text)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-#### B. Streaming en Temps Réel (Token par Token)
+---
+
+## 🍳 Cookbooks & Common Patterns
+
+### 1. Real-Time Token Streaming (SSE)
+
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def main():
     async with AIGateway("openrouter") as client:
-        async for chunk in client.stream_text("Raconte une fable courte sur les robots."):
+        async for chunk in client.stream_text("Write a short poem about space exploration."):
             print(chunk, end="", flush=True)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-#### C. Smart Fallback Gateway (Tolérance aux Pannes)
+### 2. Smart Fallback Gateway (Zero Downtime)
+
+Automatically failover across a priority list when a provider hits rate limits (HTTP 429) or experiences downtime:
+
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    # Bascule automatiquement sur le suivant si un provider est saturé (429) ou indisponible
+    # Priority: Free -> Free -> Free -> Paid
     async with AIGateway.with_fallback(["gemini_free", "nvidia_free", "openrouter", "deepseek"]) as client:
-        res = await client.generate_text("Synthétise les avantages de Python 3.14.")
+        res = await client.generate_text("Summarize the key advantages of Python 3.14.")
         print(f"[{res.provider}] {res.text}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-#### D. Sortie JSON Structurée Garantie
+### 3. Multi-Turn Conversation (Chat)
+
+```python
+import asyncio
+from nexusai_client import AIGateway, ChatMessage
+
+async def main():
+    history = [
+        ChatMessage(role="system", content="You are a senior algorithms instructor."),
+        ChatMessage(role="user", content="How does QuickSort work?"),
+    ]
+    async with AIGateway("mistral") as client:
+        response = await client.chat(history)
+        print(response.text)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### 4. Guaranteed Structured JSON Output
+
 ```python
 import asyncio, json
 from nexusai_client import AIGateway
@@ -141,52 +168,84 @@ from nexusai_client import AIGateway
 async def main():
     async with AIGateway("gemini_free") as client:
         res = await client.generate_text(
-            prompt="Extrais les informations de profil : Alice, 28 ans, développeuse.",
+            prompt="Extract profile data: Alice, 28 years old, Software Engineer.",
             json_mode=True,
         )
         data = json.loads(res.text)
-        print("Profil JSON :", data)
+        print("Parsed JSON:", data)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### 5. Inspect Real-Time Account Balances & Quotas
+
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    async with AIGateway("deepseek") as client:
+        account = await client.get_account_info()
+        print(account.format_summary())
+        # Output: "Solde restant: $4.99 | (Offert: $0.00)"
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+👉 **[Read the Full Integration Guide (FastAPI, Background Workers, Chat Sessions)](./INTEGRATION_GUIDE.md)**
+
 ---
 
-## 🛠️ Outils CLI Inclus
+## 🛠️ CLI Utilities Included
 
+The package includes CLI diagnostic tools to audit your accesses and explore live models:
+
+### 1. Test & Benchmark Access in Real-Time
 ```bash
-# 1. Tester et benchmarker tous vos accès et budgets en direct
 uv run python verify_access.py
+```
+*Validates `.env` keys, inspects real-time balances, tests inference, and measures network latency in milliseconds.*
 
-# 2. Explorer le catalogue mondial de 640+ modèles
+### 2. Live Catalog Explorer (640+ Models)
+```bash
+# List free-tier models only
 uv run python list_all_models.py --free
-uv run python list_all_models.py --search llama
-uv run python list_all_models.py --export catalogue_ia.json
 
-# 3. Lancer la suite de tests unitaires automatisés
+# Search by keyword (e.g., llama, r1, codestral, sonnet)
+uv run python list_all_models.py --search llama
+
+# Export complete catalog with pricing to JSON
+uv run python list_all_models.py --export models_catalog.json
+```
+
+### 3. Automated Unit Test Suite
+```bash
 uv run pytest -v
 ```
 
 ---
 
-## 🛡️ Gestion Typée des Exceptions
+## 🛡️ Strongly-Typed Exceptions
+
+All exceptions inherit from `NexusAIError` for clean error handling:
 
 ```python
 from nexusai_client import (
     AIGateway,
     NexusAIError,
-    MissingAPIKeyError,    # Clé API absente dans le .env
-    AuthenticationError,   # Clé rejetée (HTTP 401/403)
-    RateLimitError,        # Quota dépassé (HTTP 429)
-    APITimeoutError,       # Délai d'attente réseau expiré
-    APIConnectionError,    # Serveur injoignable
-    ProviderNotFoundError, # Fournisseur non reconnu
+    MissingAPIKeyError,    # Missing API key in environment
+    AuthenticationError,   # Invalid key (HTTP 401/403)
+    RateLimitError,        # Quota exceeded (HTTP 429)
+    APITimeoutError,       # Network timeout
+    APIConnectionError,    # Unreachable provider host
+    ProviderNotFoundError, # Unknown provider requested
 )
 ```
 
 ---
 
-## 📄 Licence
+## 📄 License
 
-Ce projet est distribué sous licence **MIT**.
+This project is licensed under the **MIT License**. Free for personal and commercial use.
