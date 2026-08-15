@@ -60,7 +60,7 @@ class ProviderDefaults:
 
     # Cerebras (Wafer-Scale Ultra-Fast Inference)
     CEREBRAS_BASE_URL: Final[str] = "https://api.cerebras.ai/v1"
-    CEREBRAS_MODEL: Final[str] = "llama-3.3-70b"
+    CEREBRAS_MODEL: Final[str] = "gpt-oss-120b"
     CEREBRAS_ENV_KEY: Final[str] = "CEREBRAS_API_KEY"
 
     # Cohere (Enterprise & Free Trial Tier)

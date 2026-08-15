@@ -23,6 +23,7 @@ class GroqProvider(OpenAICompatibleProvider):
         *,
         api_key: str | None = None,
         base_url: str | None = None,
+        model: str | None = None,
         default_model: str | None = None,
         timeout: float | None = None,
         **kwargs: Any,
@@ -31,7 +32,7 @@ class GroqProvider(OpenAICompatibleProvider):
             "groq",
             api_key=api_key,
             base_url=base_url,
-            model=default_model,
+            model=model or default_model,
             timeout=timeout,
         )
         super().__init__(

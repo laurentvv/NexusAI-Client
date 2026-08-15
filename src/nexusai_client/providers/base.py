@@ -49,7 +49,9 @@ class BaseAIProvider(ABC):
         self.default_model: str = default_model
         self.timeout: float = timeout
         self.extra_headers: dict[str, str] = extra_headers or {}
-        self.extra_params: dict[str, Any] = kwargs
+        self.extra_params: dict[str, Any] = {
+            k: v for k, v in kwargs.items() if v is not None and k not in ("model", "default_model")
+        }
         self._client: httpx.AsyncClient | None = None
 
     @property
