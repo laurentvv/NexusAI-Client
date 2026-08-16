@@ -1,12 +1,15 @@
 """NexusAI-Client: A lightweight, unified asynchronous Python client for multi-provider AI APIs.
 
 Supported Providers:
-1. DeepSeek (Paid API)
-2. Gemini Pro (Paid API)
-3. Gemini Free (Via Google AI Studio)
-4. Mistral (Free Tier / La Plateforme)
-5. Nvidia NIM (Free Tier API)
-6. OpenRouter (Free Tier)
+1. Cerebras (Free Tier / CS-3 Wafer-Scale)
+2. Cohere (Free Trial / V2 REST)
+3. DeepSeek (Paid API)
+4. Gemini Pro (Paid API)
+5. Gemini Free (Via Google AI Studio)
+6. Groq (Free Tier / LPU)
+7. Mistral (Free Tier / La Plateforme)
+8. Nvidia NIM (Free Tier API)
+9. OpenRouter (Free & Paid Hub)
 """
 
 from __future__ import annotations

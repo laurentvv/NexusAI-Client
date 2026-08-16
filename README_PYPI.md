@@ -1,22 +1,20 @@
 <p align="center">
-  <img src="./assets/banner.jpg" alt="NexusAI-Client - Unified Multi-Provider AI Gateway" width="100%">
+  <img src="https://raw.githubusercontent.com/laurentvv/NexusAI-Client/main/assets/banner.jpg" alt="NexusAI-Client - Unified Multi-Provider AI Gateway" width="100%">
 </p>
 
 # NexusAI-Client ⚡
 
 <p align="center">
-  <strong>An ultra-lightweight, strictly-typed, asynchronous Python 3.12+ gateway for multi-provider AI APIs.</strong><br>
+  <strong>An ultra-lightweight, strictly-typed, asynchronous Python gateway for multi-provider AI APIs.</strong><br>
   <em>Unify Cerebras, Cohere, DeepSeek, Google Gemini (Free & Pro), Groq, Mistral, Nvidia NIM, and OpenRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/v/nexusai-client.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+"></a>
-  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package_manager-uv-DE5FE9.svg?style=flat-square" alt="uv"></a>
+  <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/pyversions/nexusai-client.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
+  <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/l/nexusai-client.svg?style=flat-square" alt="License MIT"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
-  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-21%2F21_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License MIT"></a>
 </p>
 
 ---
@@ -26,14 +24,16 @@
 Integrating multiple AI providers in modern Python applications usually requires installing **8 or 9 separate proprietary SDKs** (`google-genai`, `openai`, `groq`, `cohere`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
 
 **NexusAI-Client** solves this at the core:
-- 🪶 **Zero Heavyweight Dependencies**: Powered purely by `httpx` and `python-dotenv`.
-- ⚡ **Native Asynchronous & SSE Streaming**: Stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
-- 🔄 **Zero-Cost-First Smart Fallback**: Automatic progression from 100% Free Tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, Mistral) to Paid Backups (`AIGateway.auto_fallback()`).
-- 🚀 **World-Record Hardware Accelerators**: Native support for Groq LPUs and Cerebras CS-3 Wafer-Scale engines (2,000+ tokens/sec).
-- 🧠 **Enterprise Reasoning & Search Models**: Native Cohere Command R+ and DeepSeek R1 support.
-- 🎯 **Guaranteed JSON Outputs**: Native `json_mode=True` across all supported providers.
-- 💰 **Live Account & Budget Inspection**: Inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
-- 🔍 **670+ Models Discovered Live**: Automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
+
+- 🪶 **Zero Heavyweight Dependencies** — powered purely by `httpx` and `python-dotenv`.
+- ⚡ **Native Asynchronous & SSE Streaming** — stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
+- 🔄 **Zero-Cost-First Smart Fallback** — automatic progression from 100% free tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, Mistral) to paid backups with `AIGateway.auto_fallback()`.
+- 🚀 **World-Record Hardware Accelerators** — native support for Groq LPUs and Cerebras CS-3 wafer-scale engines (2,000+ tokens/sec).
+- 🧠 **Enterprise Reasoning & Search Models** — native Cohere Command R+ and DeepSeek R1 support.
+- 🎯 **Guaranteed JSON Outputs** — native `json_mode=True` across all supported providers.
+- 💰 **Live Account & Budget Inspection** — inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
+- 🔍 **670+ Models Discovered Live** — automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
+- 👁️ **Multimodal Vision** — analyze images, charts, and documents with automatic vision-model resolution via `analyze_image()` and `AIGateway.auto_fallback_vision()`.
 
 ---
 
@@ -41,7 +41,7 @@ Integrating multiple AI providers in modern Python applications usually requires
 
 Why pay for AI calls when you can leverage high-throughput free tiers first, with seamless automatic fallback to paid commercial models?
 
-**`NexusAI-Client` automatically prioritizes zero-cost models before touching your wallet:**
+**NexusAI-Client automatically prioritizes zero-cost models before touching your wallet:**
 
 ```
   ┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -59,7 +59,7 @@ Why pay for AI calls when you can leverage high-throughput free tiers first, wit
   └────────────────────────────────────────────────────┴───────────────────────────────────────────────────┘
 ```
 
-### 1-Line Zero-Cost Failover in Your Code:
+### 1-Line Zero-Cost Failover in Your Code
 
 ```python
 import asyncio
@@ -107,17 +107,16 @@ uv add nexusai-client
 
 # With poetry
 poetry add nexusai-client
-
-# Local / Editable mode (development)
-uv add --editable /path/to/NexusAI-Client
 ```
 
 ### 2. Configure API Keys (`.env`)
 
-Create a `.env` file at the root of your project:
+**No configuration code needed**: as soon as you `import nexusai_client`, the package automatically loads the `.env` file found in your current working directory (via `python-dotenv`). Real environment variables always take precedence.
+
+Create a `.env` file at the root of your project with **only the keys you have** — every provider is optional:
 
 ```env
-# Free Tiers (Priority 1)
+# ── Free Tiers (Priority 1) ────────────────────────────────────────────────
 GEMINI_FREE_API_KEY=your_google_ai_studio_key
 GROQ_API_KEY=gsk_your_groq_key
 CEREBRAS_API_KEY=csk-your_cerebras_key
@@ -126,10 +125,37 @@ NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
 MISTRAL_API_KEY=your_mistral_api_key
 
-# Paid Tiers (Backup Priority 2)
+# ── Paid Tiers (Backup Priority 2) ─────────────────────────────────────────
 DEEPSEEK_API_KEY=sk-your_deepseek_key
 GEMINI_PRO_API_KEY=your_gemini_pro_key
 ```
+
+#### Where to get each API key
+
+| Provider | Environment Variable | Get a key |
+| :--- | :--- | :--- |
+| Gemini Free | `GEMINI_FREE_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) |
+| Gemini Pro | `GEMINI_PRO_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) / GCP |
+| Groq | `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) |
+| Cerebras | `CEREBRAS_API_KEY` | [cloud.cerebras.ai](https://cloud.cerebras.ai) |
+| Cohere | `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com/api-keys) |
+| Nvidia NIM | `NVIDIA_API_KEY` | [build.nvidia.com](https://build.nvidia.com) |
+| OpenRouter | `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| Mistral | `MISTRAL_API_KEY` | [console.mistral.ai](https://console.mistral.ai/api-keys) |
+| DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
+
+> **Notes:**
+> - `GEMINI_API_KEY` is accepted as a fallback alias for both `GEMINI_FREE_API_KEY` and `GEMINI_PRO_API_KEY`.
+> - You can also pass a key directly in code: `AIGateway("groq", api_key="gsk_...")` — useful for CI/CD or key rotation without touching `.env`.
+
+#### Optional advanced environment variables
+
+| Variable | Purpose | Default |
+| :--- | :--- | :--- |
+| `DEEPSEEK_DEFAULT_MODEL`, `GROQ_DEFAULT_MODEL`, `CEREBRAS_DEFAULT_MODEL`, ... | Override the default model of a provider | Provider defaults (see matrix above) |
+| `DEEPSEEK_BASE_URL`, `GROQ_BASE_URL`, `MISTRAL_BASE_URL`, ... | Point a provider at a custom endpoint or proxy | Official provider API URL |
+| `NEXUS_DEFAULT_TIMEOUT` | Global request timeout in seconds (all providers) | `60` |
+| `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | App attribution headers sent to OpenRouter | `https://github.com/NexusAI-Client` / `NexusAI-Client` |
 
 ### 3. Basic Generation
 
@@ -166,8 +192,6 @@ if __name__ == "__main__":
 ```
 
 ### 2. Custom Fallback Chain (Fine-Grained Strategy)
-
-Define your own explicit priority list:
 
 ```python
 import asyncio
@@ -261,37 +285,6 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-👉 **[Read the Full Integration Guide (FastAPI, Background Workers, Chat Sessions)](./INTEGRATION_GUIDE.md)**
-
----
-
-## 🛠️ CLI Utilities Included
-
-The package includes CLI diagnostic tools to audit your accesses and explore live models:
-
-### 1. Test & Benchmark Access in Real-Time
-```bash
-uv run python verify_access.py
-```
-*Validates `.env` keys, inspects real-time balances, tests inference, and measures network latency in milliseconds.*
-
-### 2. Live Catalog Explorer (670+ Models)
-```bash
-# List free-tier models only
-uv run python list_all_models.py --free
-
-# Search by keyword (e.g., llama, r1, command, sonnet)
-uv run python list_all_models.py --search llama
-
-# Export complete catalog with pricing to JSON
-uv run python list_all_models.py --export models_catalog.json
-```
-
-### 3. Automated Unit Test Suite
-```bash
-uv run pytest -v
-```
-
 ---
 
 ## 🛡️ Strongly-Typed Exceptions
@@ -310,6 +303,16 @@ from nexusai_client import (
     ProviderNotFoundError, # Unknown provider requested
 )
 ```
+
+The package ships a `py.typed` marker (PEP 561): all types are available to your IDE and type checker out of the box.
+
+---
+
+## 📚 Resources
+
+- **Source code:** [github.com/laurentvv/NexusAI-Client](https://github.com/laurentvv/NexusAI-Client)
+- **Full Integration Guide** (FastAPI, background workers, chat sessions): [INTEGRATION_GUIDE.md](https://github.com/laurentvv/NexusAI-Client/blob/main/INTEGRATION_GUIDE.md)
+- **Issue tracker:** [github.com/laurentvv/NexusAI-Client/issues](https://github.com/laurentvv/NexusAI-Client/issues)
 
 ---
 
