@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>An ultra-lightweight, strictly-typed, asynchronous Python gateway for multi-provider AI APIs.</strong><br>
-  <em>Unify Cerebras, Cohere, DeepSeek, Google Gemini (Free & Pro), Groq, Mistral, Nvidia NIM, and OpenRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
+  <em>Unify Cerebras, Cohere, DeepSeek, Google Gemini (Free & Pro), Groq, Mistral, Nvidia NIM, OpenRouter, and OrcaRouter behind a single, elegant interface with zero heavy SDK dependencies.</em>
 </p>
 
 <p align="center">
@@ -21,18 +21,18 @@
 
 ## 💡 Why NexusAI-Client?
 
-Integrating multiple AI providers in modern Python applications usually requires installing **8 or 9 separate proprietary SDKs** (`google-genai`, `openai`, `groq`, `cohere`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
+Integrating multiple AI providers in modern Python applications usually requires installing **9 or 10 separate proprietary SDKs** (`google-genai`, `openai`, `groq`, `cohere`, `mistralai`, etc.). This creates dozens of transitive dependencies, version conflicts, memory overhead, and fragmented codebases.
 
 **NexusAI-Client** solves this at the core:
 
 - 🪶 **Zero Heavyweight Dependencies** — powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming** — stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
-- 🔄 **Zero-Cost-First Smart Fallback** — automatic progression from 100% free tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, Mistral) to paid backups with `AIGateway.auto_fallback()`.
+- 🔄 **Zero-Cost-First Smart Fallback** — automatic progression from 100% free tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, OrcaRouter, Mistral) to paid backups with `AIGateway.auto_fallback()`.
 - 🚀 **World-Record Hardware Accelerators** — native support for Groq LPUs and Cerebras CS-3 wafer-scale engines (2,000+ tokens/sec).
-- 🧠 **Enterprise Reasoning & Search Models** — native Cohere Command R+ and DeepSeek R1 support.
+- 🧠 **Enterprise Reasoning & Search Models** — native Cohere Command R+, DeepSeek R1, and Qwen 3.8 models.
 - 🎯 **Guaranteed JSON Outputs** — native `json_mode=True` across all supported providers.
 - 💰 **Live Account & Budget Inspection** — inspect real-time balances (USD, NGC credits) and rate limits (RPM, TPM, RPD).
-- 🔍 **670+ Models Discovered Live** — automatic detection of free-tier models (`:free`) and accurate per-million-token pricing.
+- 🔍 **670+ Models Discovered Live** — automatic detection of free-tier models (`:free`, `-free`) and accurate per-million-token pricing.
 - 👁️ **Multimodal Vision** — analyze images, charts, and documents with automatic vision-model resolution via `analyze_image()` and `AIGateway.auto_fallback_vision()`.
 
 ---
@@ -44,19 +44,19 @@ Why pay for AI calls when you can leverage high-throughput free tiers first, wit
 **NexusAI-Client automatically prioritizes zero-cost models before touching your wallet:**
 
 ```
-  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-  │                                       100% FREE ZERO-COST TIERS                                        │
-  ├──────────────┬──────────────┬──────────────────┬──────────────┬──────────────┬──────────────┬──────────┤
-  │ 1. Gemini    │ 2. Groq LPU  │ 3. Cerebras CS-3 │ 4. Nvidia    │ 5. OpenRouter│ 6. Cohere    │ 7.Mistral│
-  │ (1M Context) │ (Ultra-Fast) │ (2000+ tok/s)    │ (1k Credits) │ (Free Hub)   │ (Command R+) │ (Dev Free│
-  └──────┬───────┴──────┬───────┴────────┬─────────┴──────┬───────┴──────┬───────┴──────┬───────┴────┬─────┘
-         │              │                │                │              │              │            │
-         ▼ (If Rate-Limited / 429 Quota Exceeded / Network Outage / Timeout) ────────────────────────▼
-  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-  │                                   ULTRA-LOW-COST PAID BACKUP TIERS                                     │
-  ├────────────────────────────────────────────────────┬───────────────────────────────────────────────────┤
-  │ 8. DeepSeek ($0.27 / 1M tokens)                    │ 9. Gemini Pro (Enterprise GCP)                    │
-  └────────────────────────────────────────────────────┴───────────────────────────────────────────────────┘
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │                                               100% FREE ZERO-COST TIERS                                                │
+  ├──────────────┬──────────────┬──────────────────┬──────────────┬──────────────┬──────────────┬──────────────┬───────────┤
+  │ 1. Gemini    │ 2. Groq LPU  │ 3. Cerebras CS-3 │ 4. Nvidia    │ 5. OpenRouter│ 6. OrcaRouter│ 7. Cohere    │ 8. Mistral│
+  │ (1M Context) │ (Ultra-Fast) │ (2000+ tok/s)    │ (1k Credits) │ (Free Hub)   │ (Qwen/DeepS) │ (Command R+) │ (Dev Free)│
+  └──────┬───────┴──────┬───────┴────────┬─────────┴──────┬───────┴──────┬───────┴──────┬───────┴──────┬───────┴─────┬─────┘
+         │              │                │                │              │              │              │             │
+         ▼ (If Rate-Limited / 429 Quota Exceeded / Network Outage / Timeout) ────────────────────────────────────────▼
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │                                           ULTRA-LOW-COST PAID BACKUP TIERS                                             │
+  ├────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────┤
+  │ 9. DeepSeek ($0.27 / 1M tokens)                            │ 10. Gemini Pro (Enterprise GCP)                           │
+  └────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────┘
 ```
 
 ### 1-Line Zero-Cost Failover in Your Code
@@ -91,6 +91,7 @@ if __name__ == "__main__":
 | **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
 | **Nvidia NIM** | `"nvidia_free"` | Free (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1,000 Free GPU Inference Credits (NGC) |
 | **OpenRouter** | `"openrouter"` | Free & Paid | OpenAI Chat API | `openrouter/free` | 19 Free models live + 390 Commercial models |
+| **OrcaRouter** | `"orcarouter"` (or `"orcarouter_free"`) | Free & Paid | OpenAI Chat API | `qwen/qwen3.8-27b-free` | Zero-margin gateway + Free tier models (`-free`) |
 
 ---
 
@@ -123,6 +124,7 @@ CEREBRAS_API_KEY=csk-your_cerebras_key
 COHERE_API_KEY=your_cohere_key
 NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
+ORCAROUTER_API_KEY=sk-orca-your_orcarouter_key
 MISTRAL_API_KEY=your_mistral_api_key
 
 # ── Paid Tiers (Backup Priority 2) ─────────────────────────────────────────
@@ -141,6 +143,7 @@ GEMINI_PRO_API_KEY=your_gemini_pro_key
 | Cohere | `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com/api-keys) |
 | Nvidia NIM | `NVIDIA_API_KEY` | [build.nvidia.com](https://build.nvidia.com) |
 | OpenRouter | `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| OrcaRouter | `ORCAROUTER_API_KEY` | [www.orcarouter.ai/console](https://www.orcarouter.ai/console) |
 | Mistral | `MISTRAL_API_KEY` | [console.mistral.ai](https://console.mistral.ai/api-keys) |
 | DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
 

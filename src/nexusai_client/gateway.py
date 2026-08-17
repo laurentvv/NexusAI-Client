@@ -32,6 +32,7 @@ from nexusai_client.providers.groq import GroqProvider
 from nexusai_client.providers.mistral import MistralProvider
 from nexusai_client.providers.nvidia import NvidiaProvider
 from nexusai_client.providers.openrouter import OpenRouterProvider
+from nexusai_client.providers.orcarouter import OrcaRouterProvider
 
 logger = logging.getLogger("nexusai_client")
 
@@ -87,6 +88,12 @@ _PROVIDER_REGISTRY: ProviderClassMap = {
     "openrouter": OpenRouterProvider,
     "openrouter_free": OpenRouterProvider,
     "openrouter-free": OpenRouterProvider,
+    # OrcaRouter (Zero-Margin Free & Commercial Gateway)
+    ProviderType.ORCAROUTER: OrcaRouterProvider,
+    ProviderType.ORCAROUTER_FREE: OrcaRouterProvider,
+    "orcarouter": OrcaRouterProvider,
+    "orcarouter_free": OrcaRouterProvider,
+    "orcarouter-free": OrcaRouterProvider,
 }
 
 
@@ -393,6 +400,7 @@ class AIGateway:
             "cerebras_free",
             "nvidia_free",
             "openrouter",
+            "orcarouter_free",
             "cohere_free",
             "mistral",
         ]
@@ -521,6 +529,7 @@ class AIGateway:
             "mistral",
             "nvidia (or nvidia_free)",
             "openrouter (or openrouter_free)",
+            "orcarouter (or orcarouter_free)",
         }
         return sorted(unique_names)
 
@@ -542,6 +551,7 @@ class AIGateway:
             "mistral",
             "nvidia",
             "openrouter",
+            "orcarouter",
         ]
         results: dict[str, list[ModelInfo]] = {}
 
@@ -579,6 +589,7 @@ class AIGateway:
             "mistral",
             "nvidia",
             "openrouter",
+            "orcarouter",
         ]
         results: dict[str, AccountInfo] = {}
 

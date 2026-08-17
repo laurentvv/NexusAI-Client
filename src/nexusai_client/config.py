@@ -53,6 +53,11 @@ class ProviderDefaults:
     OPENROUTER_MODEL: Final[str] = "openrouter/free"
     OPENROUTER_ENV_KEY: Final[str] = "OPENROUTER_API_KEY"
 
+    # OrcaRouter (Multi-provider Zero-Margin Gateway with Free Models)
+    ORCAROUTER_BASE_URL: Final[str] = "https://api.orcarouter.ai/v1"
+    ORCAROUTER_MODEL: Final[str] = "qwen/qwen3.8-27b-free"
+    ORCAROUTER_ENV_KEY: Final[str] = "ORCAROUTER_API_KEY"
+
     # Groq (Ultra-Fast Free LPU Tier)
     GROQ_BASE_URL: Final[str] = "https://api.groq.com/openai/v1"
     GROQ_MODEL: Final[str] = "llama-3.3-70b-versatile"
@@ -252,6 +257,23 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.OPENROUTER_VISION_MODEL,
         env_base_url_var="OPENROUTER_BASE_URL",
         env_model_var="OPENROUTER_DEFAULT_MODEL",
+    ),
+    # OrcaRouter
+    "orcarouter": _ProviderMeta(
+        name="OrcaRouter",
+        env_key=ProviderDefaults.ORCAROUTER_ENV_KEY,
+        default_base_url=ProviderDefaults.ORCAROUTER_BASE_URL,
+        default_model=ProviderDefaults.ORCAROUTER_MODEL,
+        env_base_url_var="ORCAROUTER_BASE_URL",
+        env_model_var="ORCAROUTER_DEFAULT_MODEL",
+    ),
+    "orcarouter_free": _ProviderMeta(
+        name="OrcaRouter",
+        env_key=ProviderDefaults.ORCAROUTER_ENV_KEY,
+        default_base_url=ProviderDefaults.ORCAROUTER_BASE_URL,
+        default_model=ProviderDefaults.ORCAROUTER_MODEL,
+        env_base_url_var="ORCAROUTER_BASE_URL",
+        env_model_var="ORCAROUTER_DEFAULT_MODEL",
     ),
 }
 

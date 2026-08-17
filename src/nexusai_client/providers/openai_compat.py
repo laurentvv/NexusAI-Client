@@ -298,7 +298,9 @@ class OpenAICompatibleProvider(BaseAIProvider):
 
         try:
             async with client.stream("POST", self.chat_endpoint, headers=headers, json=payload) as response:
-                self._handle_http_error(response)
+                if not response.is_success:
+                    await response.aread()
+                    self._handle_http_error(response)
 
                 async for line in response.aiter_lines():
                     clean_line = line.strip()

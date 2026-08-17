@@ -10,6 +10,7 @@ Supported Providers:
 7. Mistral (Free Tier / La Plateforme)
 8. Nvidia NIM (Free Tier API)
 9. OpenRouter (Free & Paid Hub)
+10. OrcaRouter (Free Tier & Zero-Margin Multi-provider Gateway)
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ from nexusai_client.providers import (
     NvidiaProvider,
     OpenAICompatibleProvider,
     OpenRouterProvider,
+    OrcaRouterProvider,
 )
 from nexusai_client.utils import (
     load_image_as_base64_and_mime,
@@ -90,6 +92,7 @@ __all__ = [
     "MistralProvider",
     "NvidiaProvider",
     "OpenRouterProvider",
+    "OrcaRouterProvider",
     # Configuration
     "Config",
     "ProviderConfig",

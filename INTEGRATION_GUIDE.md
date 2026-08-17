@@ -60,9 +60,12 @@ In your application's `.env` file, specify the API keys for the providers you wa
 # Free Tiers
 GEMINI_FREE_API_KEY=your_google_ai_studio_key
 GROQ_API_KEY=gsk_your_groq_key
+CEREBRAS_API_KEY=csk-your_cerebras_key
+COHERE_API_KEY=your_cohere_key
 MISTRAL_API_KEY=your_mistral_api_key
 NVIDIA_API_KEY=nvapi-your_nvidia_nim_key
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
+ORCAROUTER_API_KEY=sk-orca-your_orcarouter_key
 
 # Paid Tiers (Optional)
 DEEPSEEK_API_KEY=sk-your_deepseek_key
