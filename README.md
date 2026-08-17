@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/v/nexusai-client.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://nexus-ai-client-doc.vercel.app/"><img src="https://img.shields.io/badge/docs-nexus--ai--client--doc.vercel.app-00DC82.svg?style=flat-square&logo=vercel&logoColor=white" alt="Documentation Website"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+"></a>
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package_manager-uv-DE5FE9.svg?style=flat-square" alt="uv"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
@@ -18,6 +19,8 @@
   <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-32%2F32_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License MIT"></a>
 </p>
+
+> 🌐 **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
 
 ---
 

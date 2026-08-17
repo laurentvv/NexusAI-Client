@@ -51,7 +51,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/laurentvv/NexusAI-Client"
 Repository = "https://github.com/laurentvv/NexusAI-Client"
-Documentation = "https://github.com/laurentvv/NexusAI-Client/blob/main/INTEGRATION_GUIDE.md"
+Documentation = "https://nexus-ai-client-doc.vercel.app/"
 Changelog = "https://github.com/laurentvv/NexusAI-Client/releases"
 Issues = "https://github.com/laurentvv/NexusAI-Client/issues"
 

@@ -1,5 +1,7 @@
 # 📦 NexusAI-Client Integration Guide
 
+> 🌐 **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
+
 This guide explains how to integrate and consume **NexusAI-Client** as a centralized library within your Python projects (Web Applications, FastAPI / Flask backends, Autonomous AI Agents, Chatbots, Background Workers, and CLI tools).
 
 ---

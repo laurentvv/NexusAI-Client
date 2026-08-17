@@ -11,11 +11,14 @@
 
 <p align="center">
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/v/nexusai-client.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://nexus-ai-client-doc.vercel.app/"><img src="https://img.shields.io/badge/docs-nexus--ai--client--doc.vercel.app-00DC82.svg?style=flat-square&logo=vercel&logoColor=white" alt="Documentation Website"></a>
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/pyversions/nexusai-client.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/l/nexusai-client.svg?style=flat-square" alt="License MIT"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
 </p>
+
+> 🌐 **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
 
 ---
 
@@ -351,6 +354,7 @@ The package ships a `py.typed` marker (PEP 561): all types are available to your
 
 ## 📚 Resources
 
+- **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
 - **Source code:** [github.com/laurentvv/NexusAI-Client](https://github.com/laurentvv/NexusAI-Client)
 - **Full Integration Guide** (FastAPI, background workers, chat sessions): [INTEGRATION_GUIDE.md](https://github.com/laurentvv/NexusAI-Client/blob/main/INTEGRATION_GUIDE.md)
 - **Issue tracker:** [github.com/laurentvv/NexusAI-Client/issues](https://github.com/laurentvv/NexusAI-Client/issues)
