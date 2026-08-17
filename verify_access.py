@@ -84,6 +84,12 @@ PROVIDERS_TO_TEST = [
         "env_key": "OPENROUTER_API_KEY",
         "is_paid": False,
     },
+    {
+        "id": "orcarouter",
+        "name": "10. OrcaRouter (Free Tier / qwen3.8-27b-free)",
+        "env_key": "ORCAROUTER_API_KEY",
+        "is_paid": False,
+    },
 ]
 
 

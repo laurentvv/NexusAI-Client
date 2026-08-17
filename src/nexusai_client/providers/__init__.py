@@ -16,6 +16,7 @@ from nexusai_client.providers.mistral import MistralProvider
 from nexusai_client.providers.nvidia import NvidiaProvider
 from nexusai_client.providers.openai_compat import OpenAICompatibleProvider
 from nexusai_client.providers.openrouter import OpenRouterProvider
+from nexusai_client.providers.orcarouter import OrcaRouterProvider
 
 __all__ = [
     "BaseAIProvider",
@@ -30,4 +31,5 @@ __all__ = [
     "MistralProvider",
     "NvidiaProvider",
     "OpenRouterProvider",
+    "OrcaRouterProvider",
 ]

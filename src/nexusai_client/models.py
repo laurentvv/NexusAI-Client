@@ -27,6 +27,8 @@ class ProviderType(StrEnum):
     NVIDIA_FREE = "nvidia_free"
     OPENROUTER = "openrouter"
     OPENROUTER_FREE = "openrouter_free"
+    ORCAROUTER = "orcarouter"
+    ORCAROUTER_FREE = "orcarouter_free"
 
 
 type MessageRole = Literal["system", "user", "assistant"]

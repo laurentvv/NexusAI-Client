@@ -37,6 +37,7 @@ PROVIDERS = [
     ("mistral", "7. Mistral AI (Platform)"),
     ("nvidia_free", "8. Nvidia NIM (Free Tier NGC)"),
     ("openrouter", "9. OpenRouter (Multi-Provider Hub)"),
+    ("orcarouter", "10. OrcaRouter (Zero-Margin Free Models Gateway)"),
 ]
 
 

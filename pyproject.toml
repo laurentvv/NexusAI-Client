@@ -1,7 +1,7 @@
 [project]
 name = "nexusai-client"
 version = "0.1.0"
-description = "A lightweight, unified asynchronous Python client for multi-provider AI APIs (Cerebras, Cohere, DeepSeek, Gemini, Groq, Mistral, Nvidia NIM, OpenRouter) with smart free-first fallback."
+description = "A lightweight, unified asynchronous Python client for multi-provider AI APIs (Cerebras, Cohere, DeepSeek, Gemini, Groq, Mistral, Nvidia NIM, OpenRouter, OrcaRouter) with smart free-first fallback."
 readme = "README_PYPI.md"
 authors = [
     { name = "Laurent VOLFF", email = "laurentvv@gmail.com" }
@@ -25,6 +25,7 @@ keywords = [
     "cerebras",
     "nvidia",
     "openrouter",
+    "orcarouter",
     "httpx",
 ]
 classifiers = [

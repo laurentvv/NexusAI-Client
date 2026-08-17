@@ -30,6 +30,7 @@ from nexusai_client import (
     ModelInfo,
     NvidiaProvider,
     OpenRouterProvider,
+    OrcaRouterProvider,
     ProviderNotFoundError,
     ProviderType,
     RateLimitError,
@@ -100,6 +101,12 @@ def test_instantiate_with_direct_key() -> None:
     assert isinstance(client_or.provider, OpenRouterProvider)
     assert client_or.provider.api_key == "test-openrouter"
 
+    # 10. OrcaRouter
+    client_orca = AIGateway(provider="orcarouter", api_key="test-orcarouter")
+    assert isinstance(client_orca.provider, OrcaRouterProvider)
+    assert client_orca.provider.api_key == "test-orcarouter"
+    assert client_orca.provider.default_model == "qwen/qwen3.8-27b-free"
+
 
 def test_factory_create_method() -> None:
     """Test AIGateway.create() returns direct BaseAIProvider instances."""
@@ -127,6 +134,9 @@ def test_factory_create_method() -> None:
     p_openrouter = AIGateway.create("openrouter", api_key="test-key")
     assert isinstance(p_openrouter, OpenRouterProvider)
 
+    p_orcarouter = AIGateway.create("orcarouter", api_key="test-key")
+    assert isinstance(p_orcarouter, OrcaRouterProvider)
+
 
 def test_available_providers() -> None:
     """Test available_providers list."""
@@ -138,6 +148,7 @@ def test_available_providers() -> None:
     assert "gemini_pro" in providers
     assert "groq (or groq_free)" in providers
     assert "mistral" in providers
+    assert "orcarouter (or orcarouter_free)" in providers
 
 
 @pytest.mark.asyncio
@@ -647,4 +658,94 @@ async def test_analyze_image_openai_compat_mocked() -> None:
             assert res.text == "Visual description of the chart."
             assert res.provider == "nvidia"
             assert res.model == "meta/llama-3.2-11b-vision-instruct"
+
+
+@pytest.mark.asyncio
+async def test_orcarouter_account_info_and_models() -> None:
+    """Test OrcaRouter account info and models discovery with free models detection."""
+    mock_models_payload = {
+        "data": [
+            {
+                "id": "qwen/qwen3.8-27b-free",
+                "name": "Qwen 3.8 27B Free",
+                "context_length": 32768,
+                "pricing": {"prompt": "0", "completion": "0"},
+            },
+            {
+                "id": "deepseek/deepseek-v4-pro-free",
+                "name": "DeepSeek V4 Pro Free",
+                "context_length": 65536,
+            },
+            {
+                "id": "openai/gpt-4o-mini",
+                "name": "GPT-4o Mini",
+                "context_length": 128000,
+                "pricing": {"prompt": "0.00000015", "completion": "0.0000006"},
+            },
+        ]
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_models_payload,
+        request=httpx.Request("GET", "https://api.orcarouter.ai/v1/models"),
+    )
+    async with AIGateway(provider="orcarouter", api_key="sk-orca-test") as client:
+        info = await client.get_account_info()
+        assert info.provider == "orcarouter"
+        assert info.is_free_tier is True
+        assert "Fixed minute/daily windows" in (info.rate_limit_info or "")
+
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_response
+            all_models = await client.list_models()
+            assert len(all_models) == 3
+            assert all_models[0].id == "qwen/qwen3.8-27b-free"
+            assert all_models[0].is_free is True
+            assert all_models[1].id == "deepseek/deepseek-v4-pro-free"
+            assert all_models[1].is_free is True
+            assert all_models[2].is_free is False
+
+            free_models = await client.list_models(free_only=True)
+            assert len(free_models) == 2
+            assert free_models[0].id == "qwen/qwen3.8-27b-free"
+            assert free_models[1].id == "deepseek/deepseek-v4-pro-free"
+
+
+@pytest.mark.asyncio
+async def test_orcarouter_generation_mocked() -> None:
+    """Test OrcaRouter text generation with default qwen3.8-27b-free model."""
+    mock_chat_payload = {
+        "id": "orca-chatcmpl-456",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello from Qwen on OrcaRouter!",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 12,
+            "completion_tokens": 8,
+            "total_tokens": 20,
+        },
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_chat_payload,
+        request=httpx.Request("POST", "https://api.orcarouter.ai/v1/chat/completions"),
+    )
+
+    async with AIGateway(provider="orcarouter_free", api_key="sk-orca-test") as client:
+        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+            res = await client.generate_text("Hi!")
+            assert res.text == "Hello from Qwen on OrcaRouter!"
+            assert res.provider == "orcarouter"
+            assert res.model == "qwen/qwen3.8-27b-free"
+            assert res.usage is not None
+            assert res.usage.total_tokens == 20
+
 
