@@ -101,14 +101,20 @@ class MistralProvider(OpenAICompatibleProvider):
 
         for m in models:
             meta = MISTRAL_PRICING_MAP.get(m.id, {})
-            is_free = meta.get("is_free", True if "small" in m.id or "open" in m.id else False)
+            is_free = meta.get(
+                "is_free", True if "small" in m.id or "open" in m.id else False
+            )
             if free_only and not is_free:
                 continue
 
-            pricing = ModelPricing(
-                prompt_per_million=meta.get("prompt", 0.20),
-                completion_per_million=meta.get("completion", 0.60),
-            ) if not is_free else ModelPricing(prompt_per_million=0.0, completion_per_million=0.0)
+            pricing = (
+                ModelPricing(
+                    prompt_per_million=meta.get("prompt", 0.20),
+                    completion_per_million=meta.get("completion", 0.60),
+                )
+                if not is_free
+                else ModelPricing(prompt_per_million=0.0, completion_per_million=0.0)
+            )
 
             enriched.append(
                 ModelInfo(

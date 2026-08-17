@@ -86,9 +86,13 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         try:
             response = await client.get(self.models_endpoint, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -103,12 +107,16 @@ class OpenRouterProvider(OpenAICompatibleProvider):
 
                 try:
                     prompt_price = float(pricing_data.get("prompt", 0)) * 1_000_000
-                    completion_price = float(pricing_data.get("completion", 0)) * 1_000_000
+                    completion_price = (
+                        float(pricing_data.get("completion", 0)) * 1_000_000
+                    )
                 except (ValueError, TypeError):
                     prompt_price = 0.0
                     completion_price = 0.0
 
-                is_free = (prompt_price == 0.0 and completion_price == 0.0) or m_id.endswith(":free")
+                is_free = (
+                    prompt_price == 0.0 and completion_price == 0.0
+                ) or m_id.endswith(":free")
 
                 if free_only and not is_free:
                     continue
@@ -150,9 +158,13 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         try:
             response = await client.get(self.auth_key_endpoint, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -178,12 +190,16 @@ class OpenRouterProvider(OpenAICompatibleProvider):
                     c_data = c_resp.json().get("data", {})
                     total_credits = c_data.get("total_credits")
                     if total_credits is not None:
-                        credits_balance = float(total_credits) - float(c_data.get("total_usage", 0.0))
+                        credits_balance = float(total_credits) - float(
+                            c_data.get("total_usage", 0.0)
+                        )
             except Exception:
                 pass
 
-            remaining = credits_balance if credits_balance is not None else (
-                (limit_val - usage) if limit_val is not None else None
+            remaining = (
+                credits_balance
+                if credits_balance is not None
+                else ((limit_val - usage) if limit_val is not None else None)
             )
 
             return AccountInfo(

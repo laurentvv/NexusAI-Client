@@ -22,6 +22,8 @@ from nexusai_client.models import (
     AIResponse,
     ChatMessage,
     ModelInfo,
+    ToolCall,
+    ToolDefinition,
     UsageInfo,
 )
 from nexusai_client.providers.base import BaseAIProvider
@@ -59,6 +61,8 @@ class OpenAICompatibleProvider(BaseAIProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate a response for a single text prompt."""
@@ -73,6 +77,8 @@ class OpenAICompatibleProvider(BaseAIProvider):
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            tools=tools,
+            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -128,9 +134,13 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 json=payload,
             )
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -144,11 +154,15 @@ class OpenAICompatibleProvider(BaseAIProvider):
             completion_tokens = usage_data.get("completion_tokens")
             total_tokens = usage_data.get("total_tokens")
 
-            usage = UsageInfo(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            ) if total_tokens is not None else None
+            usage = (
+                UsageInfo(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                if total_tokens is not None
+                else None
+            )
 
             return AIResponse(
                 text=reply_text,
@@ -168,12 +182,14 @@ class OpenAICompatibleProvider(BaseAIProvider):
     @override
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Send a multi-turn chat conversation to the OpenAI-compatible endpoint."""
@@ -190,6 +206,12 @@ class OpenAICompatibleProvider(BaseAIProvider):
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
 
+        normalized_tools = self._normalize_tools(tools)
+        if normalized_tools:
+            payload["tools"] = normalized_tools
+            if tool_choice is not None:
+                payload["tool_choice"] = tool_choice
+
         payload.update(self.extra_params)
         payload.update(kwargs)
 
@@ -203,17 +225,53 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 json=payload,
             )
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
         try:
             data = response.json()
             choice = data["choices"][0]
-            message_content = choice.get("message", {}).get("content", "")
+            choice_msg = choice.get("message", {})
+            message_content = choice_msg.get("content") or ""
             finish_reason = choice.get("finish_reason")
+
+            # Parse tool calls
+            raw_tool_calls = choice_msg.get("tool_calls", [])
+            parsed_tool_calls: list[ToolCall] = []
+            if raw_tool_calls and isinstance(raw_tool_calls, list):
+                for tc in raw_tool_calls:
+                    tc_id = tc.get("id", "")
+                    fn_data = tc.get("function", {})
+                    fn_name = fn_data.get("name", "")
+                    raw_args = fn_data.get("arguments", "")
+                    if isinstance(raw_args, dict):
+                        args_dict = raw_args
+                        raw_args_str = json.dumps(raw_args)
+                    elif isinstance(raw_args, str):
+                        raw_args_str = raw_args
+                        try:
+                            args_dict = json.loads(raw_args) if raw_args.strip() else {}
+                        except Exception:
+                            args_dict = {}
+                    else:
+                        raw_args_str = str(raw_args)
+                        args_dict = {}
+
+                    parsed_tool_calls.append(
+                        ToolCall(
+                            id=tc_id,
+                            name=fn_name,
+                            arguments=args_dict,
+                            raw_arguments=raw_args_str,
+                        )
+                    )
 
             usage_data = data.get("usage")
             usage_info: UsageInfo | None = None
@@ -230,6 +288,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 model=target_model,
                 usage=usage_info,
                 finish_reason=finish_reason,
+                tool_calls=parsed_tool_calls,
                 raw_response=data,
             )
 
@@ -252,7 +311,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
-        """Stream real-time text chunks from a prompt."""
+        """Stream real-time text chunks from a prompt via SSE."""
         messages: list[ChatMessage] = []
         if system_prompt:
             messages.append(ChatMessage(role="system", content=system_prompt))
@@ -270,7 +329,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
     @override
     async def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
@@ -297,7 +356,9 @@ class OpenAICompatibleProvider(BaseAIProvider):
         client = await self.get_client()
 
         try:
-            async with client.stream("POST", self.chat_endpoint, headers=headers, json=payload) as response:
+            async with client.stream(
+                "POST", self.chat_endpoint, headers=headers, json=payload
+            ) as response:
                 if not response.is_success:
                     await response.aread()
                     self._handle_http_error(response)
@@ -323,9 +384,13 @@ class OpenAICompatibleProvider(BaseAIProvider):
                         continue
 
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
     @override
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:
@@ -336,9 +401,13 @@ class OpenAICompatibleProvider(BaseAIProvider):
         try:
             response = await client.get(self.models_endpoint, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -357,7 +426,9 @@ class OpenAICompatibleProvider(BaseAIProvider):
                         name=item.get("name", m_id) if isinstance(item, dict) else m_id,
                         provider=self.provider_name,
                         is_free=False,
-                        description=item.get("description") if isinstance(item, dict) else None,
+                        description=item.get("description")
+                        if isinstance(item, dict)
+                        else None,
                         raw_data=item if isinstance(item, dict) else {},
                     )
                 )

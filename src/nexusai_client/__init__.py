@@ -36,11 +36,14 @@ from nexusai_client.models import (
     AccountInfo,
     AIResponse,
     ChatMessage,
+    FunctionDefinition,
     MessageRole,
     ModelInfo,
     ModelPricing,
     ProviderType,
     StreamChunk,
+    ToolCall,
+    ToolDefinition,
     UsageInfo,
 )
 from nexusai_client.providers import (
@@ -63,7 +66,7 @@ from nexusai_client.utils import (
     load_image_as_data_uri,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Gateway & Factory
@@ -79,6 +82,9 @@ __all__ = [
     "ModelInfo",
     "ModelPricing",
     "AccountInfo",
+    "ToolCall",
+    "ToolDefinition",
+    "FunctionDefinition",
     # Providers
     "BaseAIProvider",
     "OpenAICompatibleProvider",

@@ -135,19 +135,31 @@ async def test_single_provider(item: dict[str, Any]) -> ProviderTestResult:
                 free_models = [m for m in models if m.is_free]
                 paid_models = [m for m in models if not m.is_free]
 
-                print(f"  📊 Available Models : {len(models)} total ({len(free_models)} free, {len(paid_models)} paid)")
+                print(
+                    f"  📊 Available Models : {len(models)} total ({len(free_models)} free, {len(paid_models)} paid)"
+                )
 
                 if free_models:
                     print("  🟢 Sample Free Models :")
                     for m in free_models[:4]:
-                        ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
+                        ctx = (
+                            f"{m.context_length // 1000}k"
+                            if m.context_length
+                            else "N/A"
+                        )
                         print(f"     • {m.id:<35} | Context: {ctx:<6} | {m.name}")
 
                 if paid_models:
                     print("  💳 Sample Paid Models & Pricing :")
                     for m in paid_models[:4]:
-                        cost = m.pricing.format_pricing() if m.pricing else "Standard rate"
-                        ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
+                        cost = (
+                            m.pricing.format_pricing() if m.pricing else "Standard rate"
+                        )
+                        ctx = (
+                            f"{m.context_length // 1000}k"
+                            if m.context_length
+                            else "N/A"
+                        )
                         print(f"     • {m.id:<30} | Context: {ctx:<6} | {cost}")
 
             except Exception as e:
@@ -165,9 +177,11 @@ async def test_single_provider(item: dict[str, Any]) -> ProviderTestResult:
             elapsed_ms = (time.perf_counter() - start_t) * 1000
 
             print(f"  ✅ Success! Latency : {elapsed_ms:.1f}ms")
-            print(f"  💬 Output : \"{response.text.strip()}\"")
+            print(f'  💬 Output : "{response.text.strip()}"')
             if response.usage:
-                print(f"  🔢 Tokens : {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
+                print(
+                    f"  🔢 Tokens : {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})"
+                )
 
             return ProviderTestResult(
                 provider_id=p_id,
@@ -247,7 +261,9 @@ async def main() -> None:
         print(f"{r.name:<28} | {r.status:<16} | {budget_disp:<30} | {lat_str}")
 
     print("=" * 90)
-    print("💡 Tip: To enable a provider, add its corresponding API key to your .env file.")
+    print(
+        "💡 Tip: To enable a provider, add its corresponding API key to your .env file."
+    )
 
 
 if __name__ == "__main__":

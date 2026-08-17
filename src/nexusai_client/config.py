@@ -33,7 +33,9 @@ class ProviderDefaults:
     GEMINI_PRO_ENV_KEY: Final[str] = "GEMINI_PRO_API_KEY"
 
     # Gemini Free (Google AI Studio Free Tier)
-    GEMINI_FREE_BASE_URL: Final[str] = "https://generativelanguage.googleapis.com/v1beta"
+    GEMINI_FREE_BASE_URL: Final[str] = (
+        "https://generativelanguage.googleapis.com/v1beta"
+    )
     GEMINI_FREE_MODEL: Final[str] = "gemini-2.5-flash"
     GEMINI_FREE_ENV_KEY: Final[str] = "GEMINI_FREE_API_KEY"
     GEMINI_FALLBACK_ENV_KEY: Final[str] = "GEMINI_API_KEY"
@@ -336,8 +338,12 @@ class Config:
             )
 
         env_timeout = os.getenv("NEXUS_DEFAULT_TIMEOUT")
-        resolved_timeout = timeout if timeout is not None else (
-            float(env_timeout) if env_timeout else ProviderDefaults.DEFAULT_TIMEOUT
+        resolved_timeout = (
+            timeout
+            if timeout is not None
+            else (
+                float(env_timeout) if env_timeout else ProviderDefaults.DEFAULT_TIMEOUT
+            )
         )
 
         resolved_key = api_key or cls.get_api_key(
@@ -353,7 +359,9 @@ class Config:
         extra_headers: dict[str, str] | None = None
         if "openrouter" in norm:
             extra_headers = {
-                "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://github.com/NexusAI-Client"),
+                "HTTP-Referer": os.getenv(
+                    "OPENROUTER_SITE_URL", "https://github.com/NexusAI-Client"
+                ),
                 "X-Title": os.getenv("OPENROUTER_APP_NAME", "NexusAI-Client"),
             }
 

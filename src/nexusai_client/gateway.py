@@ -22,6 +22,7 @@ from nexusai_client.models import (
     ChatMessage,
     ModelInfo,
     ProviderType,
+    ToolDefinition,
 )
 from nexusai_client.providers.base import BaseAIProvider
 from nexusai_client.providers.cerebras import CerebrasProvider
@@ -111,14 +112,18 @@ class FallbackGateway(BaseAIProvider):
         **kwargs: Any,
     ) -> None:
         if not providers:
-            raise ValueError("FallbackGateway requires at least one provider in the chain.")
+            raise ValueError(
+                "FallbackGateway requires at least one provider in the chain."
+            )
 
         self._provider_chain: list[BaseAIProvider] = []
         for p in providers:
             if isinstance(p, BaseAIProvider):
                 self._provider_chain.append(p)
             else:
-                self._provider_chain.append(AIGateway.create(p, timeout=timeout, **kwargs))
+                self._provider_chain.append(
+                    AIGateway.create(p, timeout=timeout, **kwargs)
+                )
 
         primary = self._provider_chain[0]
         super().__init__(
@@ -142,6 +147,8 @@ class FallbackGateway(BaseAIProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Attempt text generation across providers in chain order."""
@@ -155,13 +162,19 @@ class FallbackGateway(BaseAIProvider):
                     temperature=temperature,
                     max_tokens=max_tokens,
                     json_mode=json_mode,
+                    tools=tools,
+                    tool_choice=tool_choice,
                     **kwargs,
                 )
             except (NexusAIError, Exception) as err:
-                logger.warning(f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                logger.warning(
+                    f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next..."
+                )
                 last_error = err
 
-        raise RuntimeError(f"All providers in FallbackGateway chain failed. Last error: {last_error}")
+        raise RuntimeError(
+            f"All providers in FallbackGateway chain failed. Last error: {last_error}"
+        )
 
     async def analyze_image(
         self,
@@ -190,19 +203,25 @@ class FallbackGateway(BaseAIProvider):
                     **kwargs,
                 )
             except (NexusAIError, Exception) as err:
-                logger.warning(f"FallbackGateway Vision: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                logger.warning(
+                    f"FallbackGateway Vision: provider '{prov.provider_name}' failed ({err}). Trying next..."
+                )
                 last_error = err
 
-        raise RuntimeError(f"All vision providers in FallbackGateway chain failed. Last error: {last_error}")
+        raise RuntimeError(
+            f"All vision providers in FallbackGateway chain failed. Last error: {last_error}"
+        )
 
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Attempt chat completion across providers in chain order."""
@@ -215,13 +234,19 @@ class FallbackGateway(BaseAIProvider):
                     temperature=temperature,
                     max_tokens=max_tokens,
                     json_mode=json_mode,
+                    tools=tools,
+                    tool_choice=tool_choice,
                     **kwargs,
                 )
             except (NexusAIError, Exception) as err:
-                logger.warning(f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next...")
+                logger.warning(
+                    f"FallbackGateway: provider '{prov.provider_name}' failed ({err}). Trying next..."
+                )
                 last_error = err
 
-        raise RuntimeError(f"All providers in FallbackGateway chain failed. Last error: {last_error}")
+        raise RuntimeError(
+            f"All providers in FallbackGateway chain failed. Last error: {last_error}"
+        )
 
     async def stream_text(
         self,
@@ -248,14 +273,18 @@ class FallbackGateway(BaseAIProvider):
                     yield chunk
                 return
             except (NexusAIError, Exception) as err:
-                logger.warning(f"FallbackGateway: stream '{prov.provider_name}' failed ({err}). Trying next...")
+                logger.warning(
+                    f"FallbackGateway: stream '{prov.provider_name}' failed ({err}). Trying next..."
+                )
                 last_error = err
 
-        raise RuntimeError(f"All providers in FallbackGateway stream failed. Last error: {last_error}")
+        raise RuntimeError(
+            f"All providers in FallbackGateway stream failed. Last error: {last_error}"
+        )
 
     async def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
@@ -276,10 +305,14 @@ class FallbackGateway(BaseAIProvider):
                     yield chunk
                 return
             except (NexusAIError, Exception) as err:
-                logger.warning(f"FallbackGateway: stream_chat '{prov.provider_name}' failed ({err}). Trying next...")
+                logger.warning(
+                    f"FallbackGateway: stream_chat '{prov.provider_name}' failed ({err}). Trying next..."
+                )
                 last_error = err
 
-        raise RuntimeError(f"All providers in FallbackGateway stream_chat failed. Last error: {last_error}")
+        raise RuntimeError(
+            f"All providers in FallbackGateway stream_chat failed. Last error: {last_error}"
+        )
 
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:
         """Aggregate models from all chain providers."""
@@ -430,7 +463,9 @@ class AIGateway:
         return configured_paid + configured_free
 
     @classmethod
-    def get_configured_vision_providers(cls, *, prioritize_free: bool = True) -> list[str]:
+    def get_configured_vision_providers(
+        cls, *, prioritize_free: bool = True
+    ) -> list[str]:
         """Inspect environment and return active providers that support multimodal vision analysis."""
         free_vision_candidates = [
             "gemini_free",
@@ -624,6 +659,8 @@ class AIGateway:
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate text using the underlying configured provider."""
@@ -634,6 +671,8 @@ class AIGateway:
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            tools=tools,
+            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -663,12 +702,14 @@ class AIGateway:
 
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Send chat messages using the underlying configured provider."""
@@ -678,6 +719,8 @@ class AIGateway:
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            tools=tools,
+            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -703,7 +746,7 @@ class AIGateway:
 
     def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,

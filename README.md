@@ -15,7 +15,7 @@
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package_manager-uv-DE5FE9.svg?style=flat-square" alt="uv"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
-  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-26%2F26_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/laurentvv/NexusAI-Client/actions"><img src="https://img.shields.io/badge/tests-32%2F32_passing-brightgreen.svg?style=flat-square" alt="Tests"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License MIT"></a>
 </p>
 
@@ -29,6 +29,7 @@ Integrating multiple AI providers in modern Python applications usually requires
 - 🪶 **Zero Heavyweight Dependencies**: Powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming**: Stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
 - 🔄 **Zero-Cost-First Smart Fallback**: Automatic progression from 100% Free Tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, OrcaRouter, Mistral) to Paid Backups (`AIGateway.auto_fallback()`).
+- 🛠️ **Universal Tool Calling / Function Calling**: Seamless tool definitions, structured function arguments parsing, and multi-turn agent loops across Groq, Cerebras, Mistral, DeepSeek, Gemini REST, Cohere V2, and Nvidia NIM.
 - 🚀 **World-Record Hardware Accelerators**: Native support for Groq LPUs and Cerebras CS-3 Wafer-Scale engines (2,000+ tokens/sec).
 - 🧠 **Enterprise Reasoning & Search Models**: Native Cohere Command R+, DeepSeek R1, and Qwen 3.8 models.
 - 🎯 **Guaranteed JSON Outputs**: Native `json_mode=True` across all supported providers.
@@ -258,6 +259,45 @@ async def main():
         )
         print(f"[{res.provider} / {res.model}]:")
         print(res.text)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### 7. Universal Tool Calling (Autonomous AI Agents)
+
+Equip AI models with callable tools across all providers (Groq, Cerebras, Mistral, DeepSeek, Gemini, Cohere, etc.):
+
+```python
+import asyncio
+from nexusai_client import AIGateway, ChatMessage, FunctionDefinition, ToolDefinition
+
+# Define tool schema
+weather_tool = ToolDefinition(
+    function=FunctionDefinition(
+        name="get_current_weather",
+        description="Get current temperature and conditions for a given city.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "City name, e.g. Tokyo, Paris"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+            },
+            "required": ["location"],
+        },
+    )
+)
+
+async def main():
+    async with AIGateway.auto_fallback() as client:
+        messages = [ChatMessage(role="user", content="What is the weather in Tokyo?")]
+        response = await client.chat(messages=messages, tools=[weather_tool])
+
+        if response.has_tool_calls:
+            for call in response.tool_calls:
+                print(f"🔧 Tool Requested: {call.name}")
+                print(f"📦 Arguments: {call.arguments}")
+                # Execute your local Python function and return result back to agent loop!
 
 if __name__ == "__main__":
     asyncio.run(main())

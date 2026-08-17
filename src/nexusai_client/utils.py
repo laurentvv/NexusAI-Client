@@ -46,7 +46,10 @@ def load_image_as_base64_and_mime(
         return base64.b64encode(content).decode("utf-8"), mime
 
     # 3. Pathlib Path or string path
-    if isinstance(image, Path) or (isinstance(image, str) and not image.startswith(("data:", "http://", "https://"))):
+    if isinstance(image, Path) or (
+        isinstance(image, str)
+        and not image.startswith(("data:", "http://", "https://"))
+    ):
         p = Path(image)
         if p.exists() and p.is_file():
             raw_bytes = p.read_bytes()
@@ -78,7 +81,11 @@ def load_image_as_base64_and_mime(
 
 def load_image_as_data_uri(image: str | Path | bytes | BinaryIO) -> str:
     """Format image as standard base64 data URI (data:<mime>;base64,<data>)."""
-    if isinstance(image, str) and (image.startswith("http://") or image.startswith("https://") or image.startswith("data:")):
+    if isinstance(image, str) and (
+        image.startswith("http://")
+        or image.startswith("https://")
+        or image.startswith("data:")
+    ):
         return image
     b64_str, mime = load_image_as_base64_and_mime(image)
     return f"data:{mime};base64,{b64_str}"

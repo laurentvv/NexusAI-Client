@@ -14,6 +14,7 @@ This guide explains how to integrate and consume **NexusAI-Client** as a central
    - [C. Stateful Multi-Turn Chat Session](#c-stateful-multi-turn-chat-session)
    - [D. Specialized Code Generation](#d-specialized-code-generation)
    - [E. Real-Time Free Models Discovery](#e-real-time-free-models-discovery)
+   - [F. Autonomous AI Agent with Tool Calling](#f-autonomous-ai-agent-with-tool-calling)
 4. [FastAPI Endpoint Integration](#4-fastapi-endpoint-integration)
 5. [Exception Handling & Best Practices](#5-exception-handling--best-practices)
 
@@ -251,6 +252,95 @@ async def main():
     print(f"🔍 Found {len(models)} active free models:")
     for m in models[:5]:
         print(f" - [{m['provider']}] {m['id']} (Context: {m['context']})")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+### F. Autonomous AI Agent with Tool Calling
+
+Build autonomous ReAct agent loops that can query tools, databases, or external APIs seamlessly across any provider:
+
+```python
+import asyncio
+import json
+from nexusai_client import (
+    AIGateway,
+    ChatMessage,
+    FunctionDefinition,
+    ToolCall,
+    ToolDefinition,
+)
+
+# 1. Define tools
+def execute_database_query(sql_query: str) -> str:
+    """Mock local database function."""
+    return json.dumps({"status": "success", "rows": [{"id": 1, "user": "Alice", "balance": 1500}]})
+
+sql_tool = ToolDefinition(
+    function=FunctionDefinition(
+        name="execute_database_query",
+        description="Execute a read-only SQL query on the users database.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "sql_query": {
+                    "type": "string",
+                    "description": "The SQL query to execute (e.g. SELECT * FROM users)",
+                }
+            },
+            "required": ["sql_query"],
+        },
+    )
+)
+
+AVAILABLE_TOOLS = {
+    "execute_database_query": execute_database_query,
+}
+
+# 2. Run Autonomous Tool Execution Loop
+async def run_agent(user_question: str) -> str:
+    messages: list[ChatMessage] = [
+        ChatMessage(role="system", content="You are a data assistant with direct access to SQL tools."),
+        ChatMessage(role="user", content=user_question),
+    ]
+
+    async with AIGateway.auto_fallback() as client:
+        # Step 1: Query model with tools
+        response = await client.chat(messages=messages, tools=[sql_tool])
+
+        # Step 2: Check if model requested tools
+        if response.has_tool_calls:
+            # Append assistant's tool calling response to conversation history
+            messages.append(ChatMessage(role="assistant", content=response.text, tool_calls=response.tool_calls))
+
+            # Execute requested tools locally
+            for tool_call in response.tool_calls:
+                fn = AVAILABLE_TOOLS.get(tool_call.name)
+                if fn:
+                    tool_result = fn(**tool_call.arguments)
+                    # Feed tool output back to agent
+                    messages.append(
+                        ChatMessage(
+                            role="tool",
+                            name=tool_call.name,
+                            tool_call_id=tool_call.id,
+                            content=tool_result,
+                        )
+                    )
+
+            # Step 3: Get final model answer with tool observations
+            final_response = await client.chat(messages=messages)
+            return final_response.text
+
+        return response.text
+
+# --- Example Usage ---
+async def main():
+    answer = await run_agent("What is the account balance of user Alice?")
+    print("🤖 Agent Final Answer:\n", answer)
 
 if __name__ == "__main__":
     asyncio.run(main())

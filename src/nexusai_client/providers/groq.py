@@ -54,7 +54,12 @@ class GroqProvider(OpenAICompatibleProvider):
         results: list[ModelInfo] = []
         for m in models:
             # Determine approximate context length based on model ID
-            if "128k" in m.id or "llama-3.3" in m.id or "llama-3.1" in m.id or "deepseek" in m.id:
+            if (
+                "128k" in m.id
+                or "llama-3.3" in m.id
+                or "llama-3.1" in m.id
+                or "deepseek" in m.id
+            ):
                 ctx = 128_000
             elif "32768" in m.id or "mixtral" in m.id:
                 ctx = 32_768

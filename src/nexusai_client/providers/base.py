@@ -23,6 +23,7 @@ from nexusai_client.models import (
     AIResponse,
     ChatMessage,
     ModelInfo,
+    ToolDefinition,
 )
 
 
@@ -30,7 +31,7 @@ class BaseAIProvider(ABC):
     """Abstract Base Class for all AI model providers.
 
     All concrete providers implement asynchronous generation, streaming, chat,
-    and model discovery.
+    tool calling, and model discovery.
     """
 
     def __init__(
@@ -52,7 +53,9 @@ class BaseAIProvider(ABC):
         self.timeout: float = timeout
         self.extra_headers: dict[str, str] = extra_headers or {}
         self.extra_params: dict[str, Any] = {
-            k: v for k, v in kwargs.items() if v is not None and k not in ("model", "default_model", "vision_model")
+            k: v
+            for k, v in kwargs.items()
+            if v is not None and k not in ("model", "default_model", "vision_model")
         }
         self._client: httpx.AsyncClient | None = None
 
@@ -72,6 +75,8 @@ class BaseAIProvider(ABC):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate a single text response from a prompt."""
@@ -96,12 +101,14 @@ class BaseAIProvider(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Send a full conversation thread of messages to the model."""
@@ -124,7 +131,7 @@ class BaseAIProvider(ABC):
     @abstractmethod
     def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
@@ -230,15 +237,36 @@ class BaseAIProvider(ABC):
 
     def _normalize_messages(
         self,
-        messages: list[ChatMessage | dict[str, str]],
-    ) -> list[dict[str, str]]:
+        messages: list[ChatMessage | dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Normalize ChatMessage objects or dicts into standard dictionary format."""
-        normalized: list[dict[str, str]] = []
+        normalized: list[dict[str, Any]] = []
         for msg in messages:
             if isinstance(msg, ChatMessage):
                 normalized.append(msg.to_dict())
             elif isinstance(msg, dict):
-                normalized.append({"role": str(msg["role"]), "content": str(msg["content"])})
+                normalized.append(dict(msg))
             else:
-                raise TypeError(f"Invalid message type: {type(msg)}. Expected ChatMessage or dict.")
+                raise TypeError(
+                    f"Invalid message type: {type(msg)}. Expected ChatMessage or dict."
+                )
+        return normalized
+
+    def _normalize_tools(
+        self,
+        tools: list[ToolDefinition | dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
+        """Convert ToolDefinition dataclasses or dicts to standard OpenAI-style tool dicts."""
+        if not tools:
+            return None
+        normalized: list[dict[str, Any]] = []
+        for t in tools:
+            if isinstance(t, ToolDefinition):
+                normalized.append(t.to_dict())
+            elif isinstance(t, dict):
+                normalized.append(dict(t))
+            else:
+                raise TypeError(
+                    f"Invalid tool type: {type(t)}. Expected ToolDefinition or dict."
+                )
         return normalized
