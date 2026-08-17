@@ -15,25 +15,24 @@ from nexusai_client import (
     APIConnectionError,
     APITimeoutError,
     AuthenticationError,
-    BaseAIProvider,
     CerebrasProvider,
     ChatMessage,
     CohereProvider,
-    Config,
     DeepSeekProvider,
     FallbackGateway,
+    FunctionDefinition,
     GeminiFreeProvider,
     GeminiProProvider,
     GroqProvider,
     MissingAPIKeyError,
     MistralProvider,
-    ModelInfo,
     NvidiaProvider,
     OpenRouterProvider,
     OrcaRouterProvider,
     ProviderNotFoundError,
-    ProviderType,
     RateLimitError,
+    ToolCall,
+    ToolDefinition,
 )
 
 
@@ -157,8 +156,12 @@ async def test_fallback_gateway_success_first_attempt() -> None:
     p1 = AIGateway.create("gemini_free", api_key="test-key")
     p2 = AIGateway.create("openrouter", api_key="test-key")
 
-    mock_resp = AIResponse(text="Success from P1", provider="gemini_free", model="gemini-2.5-flash")
-    with patch.object(p1, "generate_text", new_callable=AsyncMock, return_value=mock_resp):
+    mock_resp = AIResponse(
+        text="Success from P1", provider="gemini_free", model="gemini-2.5-flash"
+    )
+    with patch.object(
+        p1, "generate_text", new_callable=AsyncMock, return_value=mock_resp
+    ):
         with patch.object(p2, "generate_text", new_callable=AsyncMock) as mock_p2:
             gateway = FallbackGateway([p1, p2])
             res = await gateway.generate_text("Test prompt")
@@ -172,7 +175,9 @@ async def test_fallback_gateway_fails_over_to_second() -> None:
     p1 = AIGateway.create("gemini_free", api_key="test-key")
     p2 = AIGateway.create("openrouter", api_key="test-key")
 
-    mock_resp_p2 = AIResponse(text="Success from P2", provider="openrouter", model="openrouter/free")
+    mock_resp_p2 = AIResponse(
+        text="Success from P2", provider="openrouter", model="openrouter/free"
+    )
     with patch.object(
         p1,
         "generate_text",
@@ -183,7 +188,9 @@ async def test_fallback_gateway_fails_over_to_second() -> None:
             message="Quota",
         ),
     ):
-        with patch.object(p2, "generate_text", new_callable=AsyncMock, return_value=mock_resp_p2):
+        with patch.object(
+            p2, "generate_text", new_callable=AsyncMock, return_value=mock_resp_p2
+        ):
             gateway = FallbackGateway([p1, p2])
             res = await gateway.generate_text("Test prompt")
             assert res.text == "Success from P2"
@@ -351,7 +358,9 @@ async def test_cohere_account_info_and_generation() -> None:
         assert info.provider == "cohere"
         assert "20 RPM" in (info.rate_limit_info or "")
 
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
             res = await client.generate_text("Hi Cohere")
             assert res.text == "Hello from Cohere Command R+"
@@ -431,7 +440,9 @@ async def test_openai_compatible_generation_mocked() -> None:
     )
 
     async with AIGateway(provider="openrouter", api_key="test-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
 
             resp = await client.generate_text(
@@ -471,11 +482,16 @@ async def test_gemini_generation_mocked() -> None:
     mock_response = httpx.Response(
         status_code=200,
         json=mock_payload,
-        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"),
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ),
     )
 
     async with AIGateway(provider="gemini_free", api_key="test-gemini-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
 
             resp = await client.generate_text(
@@ -497,7 +513,10 @@ async def test_chat_multi_turn() -> None:
     mock_payload = {
         "choices": [
             {
-                "message": {"role": "assistant", "content": "Je vais très bien, merci !"},
+                "message": {
+                    "role": "assistant",
+                    "content": "Je vais très bien, merci !",
+                },
                 "finish_reason": "stop",
             }
         ]
@@ -505,7 +524,9 @@ async def test_chat_multi_turn() -> None:
     mock_response = httpx.Response(
         status_code=200,
         json=mock_payload,
-        request=httpx.Request("POST", "https://integrate.api.nvidia.com/v1/chat/completions"),
+        request=httpx.Request(
+            "POST", "https://integrate.api.nvidia.com/v1/chat/completions"
+        ),
     )
 
     client = AIGateway("nvidia_free", api_key="test-nv-key")
@@ -531,7 +552,9 @@ async def test_auth_error_handling() -> None:
     )
 
     async with AIGateway(provider="deepseek", api_key="invalid-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
 
             with pytest.raises(AuthenticationError) as exc_info:
@@ -551,7 +574,9 @@ async def test_rate_limit_error_handling() -> None:
     )
 
     async with AIGateway(provider="mistral", api_key="test-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
 
             with pytest.raises(RateLimitError) as exc_info:
@@ -565,7 +590,11 @@ async def test_rate_limit_error_handling() -> None:
 async def test_connection_error_handling() -> None:
     """Test that network failures raise APIConnectionError."""
     async with AIGateway(provider="mistral", api_key="test-key") as client:
-        with patch.object(httpx.AsyncClient, "post", side_effect=httpx.ConnectError("Connection refused")):
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            side_effect=httpx.ConnectError("Connection refused"),
+        ):
             with pytest.raises(APIConnectionError) as exc_info:
                 await client.generate_text("Test prompt")
             assert "mistral" in exc_info.value.provider
@@ -574,8 +603,14 @@ async def test_connection_error_handling() -> None:
 @pytest.mark.asyncio
 async def test_timeout_error_handling() -> None:
     """Test that timeouts raise APITimeoutError."""
-    async with AIGateway(provider="deepseek", api_key="test-key", timeout=5.0) as client:
-        with patch.object(httpx.AsyncClient, "post", side_effect=httpx.TimeoutException("Read timed out")):
+    async with AIGateway(
+        provider="deepseek", api_key="test-key", timeout=5.0
+    ) as client:
+        with patch.object(
+            httpx.AsyncClient,
+            "post",
+            side_effect=httpx.TimeoutException("Read timed out"),
+        ):
             with pytest.raises(APITimeoutError) as exc_info:
                 await client.generate_text("Test prompt")
             assert exc_info.value.timeout_seconds == 5.0
@@ -583,7 +618,10 @@ async def test_timeout_error_handling() -> None:
 
 def test_utils_image_encoding() -> None:
     """Test image loading from raw bytes and data URI formatting."""
-    from nexusai_client.utils import load_image_as_base64_and_mime, load_image_as_data_uri
+    from nexusai_client.utils import (
+        load_image_as_base64_and_mime,
+        load_image_as_data_uri,
+    )
 
     # Synthetic 1x1 PNG bytes
     png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
@@ -617,11 +655,16 @@ async def test_analyze_image_gemini_mocked() -> None:
     mock_response = httpx.Response(
         status_code=200,
         json=mock_payload,
-        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"),
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ),
     )
 
     async with AIGateway("gemini_free", api_key="test-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
             png_bytes = b"\x89PNG\r\n\x1a\n"
             res = await client.analyze_image("Describe this image", png_bytes)
@@ -638,7 +681,10 @@ async def test_analyze_image_openai_compat_mocked() -> None:
     mock_payload = {
         "choices": [
             {
-                "message": {"role": "assistant", "content": "Visual description of the chart."},
+                "message": {
+                    "role": "assistant",
+                    "content": "Visual description of the chart.",
+                },
                 "finish_reason": "stop",
             }
         ],
@@ -647,11 +693,15 @@ async def test_analyze_image_openai_compat_mocked() -> None:
     mock_response = httpx.Response(
         status_code=200,
         json=mock_payload,
-        request=httpx.Request("POST", "https://integrate.api.nvidia.com/v1/chat/completions"),
+        request=httpx.Request(
+            "POST", "https://integrate.api.nvidia.com/v1/chat/completions"
+        ),
     )
 
     async with AIGateway("nvidia_free", api_key="test-key") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
             png_bytes = b"\x89PNG\r\n\x1a\n"
             res = await client.analyze_image("Explain the chart", png_bytes)
@@ -739,7 +789,9 @@ async def test_orcarouter_generation_mocked() -> None:
     )
 
     async with AIGateway(provider="orcarouter_free", api_key="sk-orca-test") as client:
-        with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
             mock_post.return_value = mock_response
             res = await client.generate_text("Hi!")
             assert res.text == "Hello from Qwen on OrcaRouter!"
@@ -749,3 +801,384 @@ async def test_orcarouter_generation_mocked() -> None:
             assert res.usage.total_tokens == 20
 
 
+def test_tool_calling_models_and_serialization() -> None:
+    """Test ToolCall, FunctionDefinition, ToolDefinition and ChatMessage serialization."""
+    tc = ToolCall(
+        id="call_123",
+        name="get_weather",
+        arguments={"city": "Paris", "unit": "celsius"},
+    )
+    assert tc.id == "call_123"
+    assert tc.name == "get_weather"
+    assert tc.arguments["city"] == "Paris"
+
+    tc_dict = tc.to_dict()
+    assert tc_dict["id"] == "call_123"
+    assert tc_dict["type"] == "function"
+    assert tc_dict["function"]["name"] == "get_weather"
+    assert "Paris" in tc_dict["function"]["arguments"]
+
+    fn = FunctionDefinition(
+        name="get_stock_price",
+        description="Fetch current stock price",
+        parameters={
+            "type": "object",
+            "properties": {"symbol": {"type": "string"}},
+            "required": ["symbol"],
+        },
+    )
+    tool = ToolDefinition(function=fn)
+    tool_dict = tool.to_dict()
+    assert tool_dict["type"] == "function"
+    assert tool_dict["function"]["name"] == "get_stock_price"
+    assert tool_dict["function"]["description"] == "Fetch current stock price"
+
+    # ChatMessage with tool calls
+    msg_assistant = ChatMessage(role="assistant", content="", tool_calls=[tc])
+    msg_dict = msg_assistant.to_dict()
+    assert msg_dict["role"] == "assistant"
+    assert len(msg_dict["tool_calls"]) == 1
+    assert msg_dict["tool_calls"][0]["id"] == "call_123"
+
+    # ChatMessage for tool output
+    msg_tool = ChatMessage(
+        role="tool", name="get_weather", tool_call_id="call_123", content='{"temp": 22}'
+    )
+    tool_msg_dict = msg_tool.to_dict()
+    assert tool_msg_dict["role"] == "tool"
+    assert tool_msg_dict["tool_call_id"] == "call_123"
+    assert tool_msg_dict["name"] == "get_weather"
+
+    # AIResponse has_tool_calls property
+    res_no_tools = AIResponse(text="Hello", provider="groq", model="llama-3.3-70b")
+    assert res_no_tools.has_tool_calls is False
+
+    res_with_tools = AIResponse(
+        text="", provider="groq", model="llama-3.3-70b", tool_calls=[tc]
+    )
+    assert res_with_tools.has_tool_calls is True
+    assert len(res_with_tools.tool_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_tool_calling_mocked() -> None:
+    """Test Tool Calling with OpenAI-compatible providers (Groq, Cerebras, Mistral, DeepSeek, etc.)."""
+    mock_payload = {
+        "id": "chatcmpl-tool-123",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_weather_99",
+                            "type": "function",
+                            "function": {
+                                "name": "get_current_weather",
+                                "arguments": '{"location": "Tokyo", "unit": "celsius"}',
+                            },
+                        }
+                    ],
+                },
+                "finish_reason": "tool_calls",
+            }
+        ],
+        "usage": {"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request(
+            "POST", "https://api.groq.com/openai/v1/chat/completions"
+        ),
+    )
+
+    tools = [
+        ToolDefinition(
+            function=FunctionDefinition(
+                name="get_current_weather",
+                description="Get weather for a given city",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"},
+                        "unit": {"type": "string"},
+                    },
+                    "required": ["location"],
+                },
+            )
+        )
+    ]
+
+    async with AIGateway(provider="groq", api_key="gsk-test") as client:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
+            mock_post.return_value = mock_response
+
+            messages = [
+                ChatMessage(role="user", content="What is the weather in Tokyo?")
+            ]
+            response = await client.chat(
+                messages=messages, tools=tools, tool_choice="auto"
+            )
+
+            assert response.has_tool_calls is True
+            assert len(response.tool_calls) == 1
+            call = response.tool_calls[0]
+            assert call.id == "call_weather_99"
+            assert call.name == "get_current_weather"
+            assert call.arguments == {"location": "Tokyo", "unit": "celsius"}
+            assert response.finish_reason == "tool_calls"
+
+            # Check request payload sent
+            called_json = mock_post.call_args.kwargs["json"]
+            assert "tools" in called_json
+            assert called_json["tools"][0]["function"]["name"] == "get_current_weather"
+            assert called_json["tool_choice"] == "auto"
+
+
+@pytest.mark.asyncio
+async def test_gemini_tool_calling_mocked() -> None:
+    """Test Tool Calling conversion and response parsing for Google Gemini REST API."""
+    mock_gemini_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [
+                        {
+                            "functionCall": {
+                                "name": "calculate_tax",
+                                "args": {"amount": 1000, "rate": 0.2},
+                            }
+                        }
+                    ],
+                },
+                "finishReason": "STOP",
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 35,
+            "candidatesTokenCount": 15,
+            "totalTokenCount": 50,
+        },
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_gemini_payload,
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ),
+    )
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "calculate_tax",
+                "description": "Calculate tax on amount",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "amount": {"type": "number"},
+                        "rate": {"type": "number"},
+                    },
+                    "required": ["amount", "rate"],
+                },
+            },
+        }
+    ]
+
+    async with AIGateway(provider="gemini_free", api_key="test-gemini-key") as client:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
+            mock_post.return_value = mock_response
+
+            response = await client.generate_text(
+                "Calculate tax for 1000 at 20%",
+                tools=tools,
+                tool_choice="auto",
+            )
+
+            assert response.has_tool_calls is True
+            assert len(response.tool_calls) == 1
+            call = response.tool_calls[0]
+            assert call.name == "calculate_tax"
+            assert call.arguments == {"amount": 1000, "rate": 0.2}
+
+            # Check that Gemini got functionDeclarations format
+            called_json = mock_post.call_args.kwargs["json"]
+            assert "tools" in called_json
+            assert "functionDeclarations" in called_json["tools"][0]
+            assert (
+                called_json["tools"][0]["functionDeclarations"][0]["name"]
+                == "calculate_tax"
+            )
+            assert called_json["toolConfig"] == {
+                "functionCallingConfig": {"mode": "AUTO"}
+            }
+
+
+@pytest.mark.asyncio
+async def test_gemini_multi_turn_tool_history() -> None:
+    """Test multi-turn conversation with functionCall and functionResponse for Gemini."""
+    from nexusai_client.providers.gemini import GeminiFreeProvider
+
+    provider = GeminiFreeProvider(api_key="test-key")
+
+    messages = [
+        ChatMessage(role="user", content="What is 5 + 3?"),
+        ChatMessage(
+            role="assistant",
+            tool_calls=[
+                ToolCall(id="call_add_1", name="add", arguments={"a": 5, "b": 3})
+            ],
+        ),
+        ChatMessage(
+            role="tool", name="add", tool_call_id="call_add_1", content='{"result": 8}'
+        ),
+    ]
+
+    _, gemini_contents = provider._convert_messages_to_gemini(messages)
+    assert len(gemini_contents) == 3
+    assert gemini_contents[0]["role"] == "user"
+    assert gemini_contents[1]["role"] == "model"
+    assert "functionCall" in gemini_contents[1]["parts"][0]
+    assert gemini_contents[1]["parts"][0]["functionCall"]["name"] == "add"
+    assert gemini_contents[2]["role"] == "user"
+    assert "functionResponse" in gemini_contents[2]["parts"][0]
+    assert gemini_contents[2]["parts"][0]["functionResponse"]["name"] == "add"
+    assert gemini_contents[2]["parts"][0]["functionResponse"]["response"] == {
+        "result": 8
+    }
+
+
+@pytest.mark.asyncio
+async def test_cohere_tool_calling_mocked() -> None:
+    """Test Tool Calling with Cohere V2 Chat API."""
+    mock_cohere_payload = {
+        "id": "cohere-chat-123",
+        "message": {
+            "role": "assistant",
+            "content": [],
+            "tool_calls": [
+                {
+                    "id": "call_stock_01",
+                    "type": "function",
+                    "function": {
+                        "name": "lookup_stock",
+                        "arguments": '{"symbol": "NVDA"}',
+                    },
+                }
+            ],
+        },
+        "finish_reason": "TOOL_CALL",
+        "usage": {"tokens": {"input_tokens": 40, "output_tokens": 15}},
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_cohere_payload,
+        request=httpx.Request("POST", "https://api.cohere.com/v2/chat"),
+    )
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "lookup_stock",
+                "description": "Lookup stock price",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"symbol": {"type": "string"}},
+                },
+            },
+        }
+    ]
+
+    async with AIGateway(provider="cohere", api_key="test-cohere-key") as client:
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
+            mock_post.return_value = mock_response
+
+            messages = [ChatMessage(role="user", content="Lookup NVDA price")]
+            response = await client.chat(messages=messages, tools=tools)
+
+            assert response.has_tool_calls is True
+            assert len(response.tool_calls) == 1
+            call = response.tool_calls[0]
+            assert call.id == "call_stock_01"
+            assert call.name == "lookup_stock"
+            assert call.arguments == {"symbol": "NVDA"}
+
+
+@pytest.mark.asyncio
+async def test_fallback_gateway_with_tools_mocked() -> None:
+    """Test FallbackGateway automatic failover when executing tool calls."""
+    mock_err_response = httpx.Response(
+        status_code=429,
+        text="Rate limit exceeded",
+        request=httpx.Request(
+            "POST", "https://api.groq.com/openai/v1/chat/completions"
+        ),
+    )
+    mock_gemini_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [
+                        {
+                            "functionCall": {
+                                "name": "search_web",
+                                "args": {"query": "NexusAI python client"},
+                            }
+                        }
+                    ],
+                },
+                "finishReason": "STOP",
+            }
+        ],
+    }
+    mock_success_response = httpx.Response(
+        status_code=200,
+        json=mock_gemini_payload,
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ),
+    )
+
+    groq_client = AIGateway.create("groq", api_key="test-groq")
+    gemini_client = AIGateway.create("gemini_free", api_key="test-gemini")
+
+    fallback_gw = FallbackGateway([groq_client, gemini_client])
+
+    tools = [
+        ToolDefinition(
+            function=FunctionDefinition(
+                name="search_web",
+                description="Search the web",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
+            )
+        )
+    ]
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        # First call (Groq) fails with 429, Second call (Gemini) succeeds
+        mock_post.side_effect = [mock_err_response, mock_success_response]
+
+        res = await fallback_gw.generate_text("Search for NexusAI", tools=tools)
+
+        assert res.has_tool_calls is True
+        assert res.provider == "gemini_free"
+        assert res.tool_calls[0].name == "search_web"
+        assert res.tool_calls[0].arguments == {"query": "NexusAI python client"}

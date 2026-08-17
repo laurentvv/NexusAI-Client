@@ -58,7 +58,9 @@ async def demonstrate_openrouter_call() -> None:
 
     try:
         async with AIGateway(provider="openrouter") as client:
-            print(f"👉 Sending request to OpenRouter ({client.provider.default_model})...")
+            print(
+                f"👉 Sending request to OpenRouter ({client.provider.default_model})..."
+            )
             response = await client.generate_text(
                 prompt=prompt,
                 system_prompt="You are an expert science educator.",
@@ -94,10 +96,66 @@ async def demonstrate_gemini_streaming() -> None:
             info = await client.get_account_info()
             print(f"📊 Gemini Quotas: {info.format_summary()}")
 
-            print(f"👉 Streaming response from Gemini ({client.provider.default_model}):\n")
-            async for chunk in client.stream_text("Name 3 key architectural advantages of asyncio in Python."):
+            print(
+                f"👉 Streaming response from Gemini ({client.provider.default_model}):\n"
+            )
+            async for chunk in client.stream_text(
+                "Name 3 key architectural advantages of asyncio in Python."
+            ):
                 print(chunk, end="", flush=True)
             print("\n" + "-" * 65)
+
+    except MissingAPIKeyError as e:
+        print(f"⚠️  Missing Key: {e.message}")
+    except NexusAIError as e:
+        print(f"❌ NexusAI Error: {e}")
+
+
+async def demonstrate_tool_calling() -> None:
+    """Demonstrate Tool Calling / Function Calling with AI models."""
+    print("\n" + "=" * 65)
+    print("🛠️ 4. UNIVERSAL TOOL CALLING (Autonomous AI Agent Functions)")
+    print("=" * 65)
+
+    from nexusai_client import ChatMessage, FunctionDefinition, ToolDefinition
+
+    weather_tool = ToolDefinition(
+        function=FunctionDefinition(
+            name="get_weather",
+            description="Get current temperature and conditions for a given city.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City name"},
+                    "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                },
+                "required": ["city"],
+            },
+        )
+    )
+
+    try:
+        async with AIGateway.auto_fallback() as client:
+            print(
+                f"👉 Querying auto-fallback gateway with tools ({client.provider_name})..."
+            )
+            messages = [
+                ChatMessage(
+                    role="user", content="What is the weather in Paris right now?"
+                )
+            ]
+            response = await client.chat(messages=messages, tools=[weather_tool])
+
+            print(
+                f"\n✅ Response received from [{response.provider} / {response.model}]:"
+            )
+            if response.has_tool_calls:
+                for call in response.tool_calls:
+                    print(f"   🔧 Function Requested: {call.name}")
+                    print(f"   📦 Arguments Parsed  : {call.arguments}")
+            else:
+                print(f"   💬 Text Response     : {response.text}")
+            print("-" * 65)
 
     except MissingAPIKeyError as e:
         print(f"⚠️  Missing Key: {e.message}")
@@ -113,6 +171,7 @@ async def main() -> None:
     await demonstrate_account_info_and_models()
     await demonstrate_openrouter_call()
     await demonstrate_gemini_streaming()
+    await demonstrate_tool_calling()
 
     print("\n🎉 Demonstration complete!")
 

@@ -24,6 +24,8 @@ from nexusai_client.models import (
     ModelInfo,
     ModelPricing,
     ProviderType,
+    ToolCall,
+    ToolDefinition,
     UsageInfo,
 )
 from nexusai_client.providers.base import BaseAIProvider
@@ -47,9 +49,38 @@ class GeminiBaseProvider(BaseAIProvider):
             **self.extra_headers,
         }
 
+    def _convert_tools_to_gemini(
+        self,
+        tools: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
+        """Convert OpenAI-style tool definitions into Gemini functionDeclarations format."""
+        if not tools:
+            return None
+
+        declarations: list[dict[str, Any]] = []
+        for tool in tools:
+            if "functionDeclarations" in tool:
+                return tools
+
+            fn = (
+                tool.get("function", tool)
+                if tool.get("type") == "function" or "function" in tool
+                else tool
+            )
+            decl: dict[str, Any] = {"name": fn.get("name", "")}
+            if fn.get("description"):
+                decl["description"] = fn["description"]
+            if fn.get("parameters"):
+                decl["parameters"] = fn["parameters"]
+            declarations.append(decl)
+
+        if declarations:
+            return [{"functionDeclarations": declarations}]
+        return None
+
     def _convert_messages_to_gemini(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
     ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
         """Convert standard messages into Gemini format."""
         system_instruction: dict[str, Any] | None = None
@@ -59,18 +90,87 @@ class GeminiBaseProvider(BaseAIProvider):
             if isinstance(msg, ChatMessage):
                 role = msg.role
                 content = msg.content
+                tool_calls = msg.tool_calls
+                name = msg.name
             else:
-                role = str(msg["role"])
-                content = str(msg["content"])
+                role = str(msg.get("role", "user"))
+                content = str(msg.get("content", "") or "")
+                raw_tc = msg.get("tool_calls", [])
+                tool_calls = (
+                    [
+                        ToolCall(
+                            id=tc.get("id", ""),
+                            name=tc.get("function", {}).get("name", ""),
+                            arguments=json.loads(
+                                tc.get("function", {}).get("arguments", "{}")
+                            )
+                            if isinstance(tc.get("function", {}).get("arguments"), str)
+                            else tc.get("function", {}).get("arguments", {}),
+                            raw_arguments=str(
+                                tc.get("function", {}).get("arguments", "")
+                            ),
+                        )
+                        for tc in raw_tc
+                    ]
+                    if raw_tc
+                    else []
+                )
+                name = msg.get("name")
 
             if role == "system":
                 system_instruction = {"parts": [{"text": content}]}
+            elif role == "assistant":
+                parts: list[dict[str, Any]] = []
+                if content:
+                    parts.append({"text": content})
+                if tool_calls:
+                    for tc in tool_calls:
+                        parts.append(
+                            {"functionCall": {"name": tc.name, "args": tc.arguments}}
+                        )
+                if not parts:
+                    parts.append({"text": ""})
+                gemini_contents.append(
+                    {
+                        "role": "model",
+                        "parts": parts,
+                    }
+                )
+            elif role == "tool":
+                try:
+                    parsed_content = (
+                        json.loads(content)
+                        if isinstance(content, str) and content.strip().startswith("{")
+                        else content
+                    )
+                except Exception:
+                    parsed_content = content
+
+                response_obj = (
+                    parsed_content
+                    if isinstance(parsed_content, dict)
+                    else {"output": parsed_content}
+                )
+                gemini_contents.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "functionResponse": {
+                                    "name": name or "tool_function",
+                                    "response": response_obj,
+                                }
+                            }
+                        ],
+                    }
+                )
             else:
-                gemini_role = "model" if role == "assistant" else "user"
-                gemini_contents.append({
-                    "role": gemini_role,
-                    "parts": [{"text": content}],
-                })
+                gemini_contents.append(
+                    {
+                        "role": "user",
+                        "parts": [{"text": content}],
+                    }
+                )
 
         return system_instruction, gemini_contents
 
@@ -84,6 +184,8 @@ class GeminiBaseProvider(BaseAIProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate response for a single text prompt."""
@@ -98,6 +200,8 @@ class GeminiBaseProvider(BaseAIProvider):
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            tools=tools,
+            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -146,15 +250,23 @@ class GeminiBaseProvider(BaseAIProvider):
         payload.update(self.extra_params)
         payload.update(kwargs)
 
-        url = f"{self.base_url}/models/{target_model}:generateContent?key={self.api_key}"
+        url = (
+            f"{self.base_url}/models/{target_model}:generateContent?key={self.api_key}"
+        )
         client = await self.get_client()
 
         try:
-            response = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+            response = await client.post(
+                url, json=payload, headers={"Content-Type": "application/json"}
+            )
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -171,11 +283,15 @@ class GeminiBaseProvider(BaseAIProvider):
             completion_tokens = usage_meta.get("candidatesTokenCount")
             total_tokens = usage_meta.get("totalTokenCount")
 
-            usage = UsageInfo(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            ) if total_tokens is not None else None
+            usage = (
+                UsageInfo(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                if total_tokens is not None
+                else None
+            )
 
             return AIResponse(
                 text=reply_text,
@@ -195,12 +311,14 @@ class GeminiBaseProvider(BaseAIProvider):
     @override
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Send chat messages to Gemini REST API."""
@@ -222,6 +340,19 @@ class GeminiBaseProvider(BaseAIProvider):
         if system_instruction:
             payload["systemInstruction"] = system_instruction
 
+        gemini_tools = self._convert_tools_to_gemini(self._normalize_tools(tools))
+        if gemini_tools:
+            payload["tools"] = gemini_tools
+            if tool_choice is not None:
+                if isinstance(tool_choice, str):
+                    mode_map = {"auto": "AUTO", "none": "NONE", "required": "ANY"}
+                    gemini_mode = mode_map.get(tool_choice.lower(), tool_choice.upper())
+                    payload["toolConfig"] = {
+                        "functionCallingConfig": {"mode": gemini_mode}
+                    }
+                elif isinstance(tool_choice, dict):
+                    payload["toolConfig"] = tool_choice
+
         payload.update(self.extra_params)
         payload.update(kwargs)
 
@@ -232,9 +363,13 @@ class GeminiBaseProvider(BaseAIProvider):
         try:
             response = await client.post(url, headers=headers, json=payload)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -243,7 +378,9 @@ class GeminiBaseProvider(BaseAIProvider):
             candidates = data.get("candidates", [])
             if not candidates:
                 prompt_feedback = data.get("promptFeedback", {})
-                block_reason = prompt_feedback.get("blockReason", "No response candidate generated")
+                block_reason = prompt_feedback.get(
+                    "blockReason", "No response candidate generated"
+                )
                 raise APIResponseError(
                     provider=self.provider_name,
                     status_code=response.status_code,
@@ -253,7 +390,28 @@ class GeminiBaseProvider(BaseAIProvider):
 
             candidate = candidates[0]
             parts = candidate.get("content", {}).get("parts", [])
-            text_output = "".join(part.get("text", "") for part in parts if "text" in part)
+            text_parts: list[str] = []
+            parsed_tool_calls: list[ToolCall] = []
+
+            for i, part in enumerate(parts):
+                if "text" in part:
+                    text_parts.append(part["text"])
+                if "functionCall" in part:
+                    fc = part["functionCall"]
+                    fc_name = fc.get("name", "")
+                    fc_args = fc.get("args", {})
+                    parsed_tool_calls.append(
+                        ToolCall(
+                            id=f"call_{fc_name}_{i + 1}",
+                            name=fc_name,
+                            arguments=fc_args if isinstance(fc_args, dict) else {},
+                            raw_arguments=json.dumps(fc_args)
+                            if isinstance(fc_args, dict)
+                            else str(fc_args),
+                        )
+                    )
+
+            text_output = "".join(text_parts)
             finish_reason = candidate.get("finishReason")
 
             usage_metadata = data.get("usageMetadata", {})
@@ -271,6 +429,7 @@ class GeminiBaseProvider(BaseAIProvider):
                 model=target_model,
                 usage=usage_info,
                 finish_reason=finish_reason,
+                tool_calls=parsed_tool_calls,
                 raw_response=data,
             )
 
@@ -311,7 +470,7 @@ class GeminiBaseProvider(BaseAIProvider):
     @override
     async def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
@@ -343,7 +502,9 @@ class GeminiBaseProvider(BaseAIProvider):
         client = await self.get_client()
 
         try:
-            async with client.stream("POST", url, headers=headers, json=payload) as response:
+            async with client.stream(
+                "POST", url, headers=headers, json=payload
+            ) as response:
                 self._handle_http_error(response)
 
                 async for line in response.aiter_lines():
@@ -365,9 +526,13 @@ class GeminiBaseProvider(BaseAIProvider):
                         continue
 
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
     @override
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:
@@ -379,9 +544,13 @@ class GeminiBaseProvider(BaseAIProvider):
         try:
             response = await client.get(url, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 

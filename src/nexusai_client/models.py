@@ -5,6 +5,7 @@ Leverages modern Python 3.14 type annotations and dataclasses.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
@@ -31,7 +32,62 @@ class ProviderType(StrEnum):
     ORCAROUTER_FREE = "orcarouter_free"
 
 
-type MessageRole = Literal["system", "user", "assistant"]
+type MessageRole = Literal["system", "user", "assistant", "tool"]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ToolCall:
+    """Represents a function or tool invocation requested by an AI model."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+    raw_arguments: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to standard OpenAI-style tool_call dictionary."""
+        return {
+            "id": self.id,
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "arguments": self.raw_arguments or json.dumps(self.arguments),
+            },
+        }
+
+
+@dataclass(slots=True, kw_only=True)
+class FunctionDefinition:
+    """Definition of a callable function tool."""
+
+    name: str
+    description: str | None = None
+    parameters: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to standard OpenAI function dictionary."""
+        d: dict[str, Any] = {"name": self.name}
+        if self.description:
+            d["description"] = self.description
+        if self.parameters:
+            d["parameters"] = self.parameters
+        return d
+
+
+@dataclass(slots=True, kw_only=True)
+class ToolDefinition:
+    """Top-level tool specification following the OpenAI JSON Schema standard."""
+
+    type: Literal["function"] = "function"
+    function: FunctionDefinition | dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to standard OpenAI tool object."""
+        if isinstance(self.function, FunctionDefinition):
+            fn_dict = self.function.to_dict()
+        else:
+            fn_dict = self.function
+        return {"type": self.type, "function": fn_dict}
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -39,11 +95,21 @@ class ChatMessage:
     """Represents a single message in a conversation thread."""
 
     role: MessageRole
-    content: str
+    content: str = ""
+    name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to standard OpenAI-style message dictionary."""
-        return {"role": self.role, "content": self.content}
+        d: dict[str, Any] = {"role": self.role, "content": self.content}
+        if self.name is not None:
+            d["name"] = self.name
+        if self.tool_call_id is not None:
+            d["tool_call_id"] = self.tool_call_id
+        if self.tool_calls:
+            d["tool_calls"] = [tc.to_dict() for tc in self.tool_calls]
+        return d
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -72,7 +138,11 @@ class ModelPricing:
         """Human-readable price representation."""
         if self.is_free:
             return "Gratuit ($0 / 1M)"
-        cache_info = f" (Cache: ${self.cache_read_per_million:.2f}/1M)" if self.cache_read_per_million is not None else ""
+        cache_info = (
+            f" (Cache: ${self.cache_read_per_million:.2f}/1M)"
+            if self.cache_read_per_million is not None
+            else ""
+        )
         return f"Input: ${self.prompt_per_million:.2f}/1M | Output: ${self.completion_per_million:.2f}/1M{cache_info}"
 
     def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
@@ -96,7 +166,11 @@ class ModelInfo:
     raw_data: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        cost_str = self.pricing.format_pricing() if self.pricing else ("Gratuit" if self.is_free else "Non spécifié")
+        cost_str = (
+            self.pricing.format_pricing()
+            if self.pricing
+            else ("Gratuit" if self.is_free else "Non spécifié")
+        )
         ctx_str = f"{self.context_length // 1000}k" if self.context_length else "N/A"
         return f"[{self.provider.upper()}] {self.id} (Contexte: {ctx_str} tokens | {cost_str})"
 
@@ -144,7 +218,13 @@ class AIResponse:
     model: str
     usage: UsageInfo | None = None
     finish_reason: str | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
     raw_response: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_tool_calls(self) -> bool:
+        """Return True if the model requested one or more tool/function calls."""
+        return len(self.tool_calls) > 0
 
     def __str__(self) -> str:
         return self.text

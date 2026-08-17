@@ -118,7 +118,11 @@ class DeepSeekProvider(OpenAICompatibleProvider):
                 provider=self.provider_name,
                 is_free=False,
                 context_length=64_000,
-                pricing=ModelPricing(prompt_per_million=0.27, completion_per_million=1.10, cache_read_per_million=0.07),
+                pricing=ModelPricing(
+                    prompt_per_million=0.27,
+                    completion_per_million=1.10,
+                    cache_read_per_million=0.07,
+                ),
                 description="Modèle généraliste DeepSeek V3.",
             ),
             ModelInfo(
@@ -127,7 +131,11 @@ class DeepSeekProvider(OpenAICompatibleProvider):
                 provider=self.provider_name,
                 is_free=False,
                 context_length=64_000,
-                pricing=ModelPricing(prompt_per_million=0.55, completion_per_million=2.19, cache_read_per_million=0.14),
+                pricing=ModelPricing(
+                    prompt_per_million=0.55,
+                    completion_per_million=2.19,
+                    cache_read_per_million=0.14,
+                ),
                 description="Modèle de raisonnement avancé DeepSeek R1.",
             ),
         ]
@@ -141,9 +149,13 @@ class DeepSeekProvider(OpenAICompatibleProvider):
         try:
             response = await client.get(self.balance_endpoint, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -151,7 +163,10 @@ class DeepSeekProvider(OpenAICompatibleProvider):
             data = response.json()
             infos = data.get("balance_infos", [])
             # Search for USD balance info first, or take primary entry
-            target_info = next((i for i in infos if i.get("currency") == "USD"), (infos[0] if infos else {}))
+            target_info = next(
+                (i for i in infos if i.get("currency") == "USD"),
+                (infos[0] if infos else {}),
+            )
 
             currency = target_info.get("currency", "USD")
             total_bal = float(target_info.get("total_balance", 0.0))

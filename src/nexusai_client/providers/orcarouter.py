@@ -66,9 +66,13 @@ class OrcaRouterProvider(OpenAICompatibleProvider):
         try:
             response = await client.get(self.models_endpoint, headers=headers)
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
@@ -89,7 +93,9 @@ class OrcaRouterProvider(OpenAICompatibleProvider):
                 if pricing_data:
                     try:
                         prompt_price = float(pricing_data.get("prompt", 0)) * 1_000_000
-                        completion_price = float(pricing_data.get("completion", 0)) * 1_000_000
+                        completion_price = (
+                            float(pricing_data.get("completion", 0)) * 1_000_000
+                        )
                     except (ValueError, TypeError):
                         prompt_price = 0.0
                         completion_price = 0.0
@@ -98,16 +104,24 @@ class OrcaRouterProvider(OpenAICompatibleProvider):
                     m_id.endswith("-free")
                     or m_id.endswith(":free")
                     or m_id == "orcarouter/free"
-                    or (prompt_price == 0.0 and completion_price == 0.0 and bool(pricing_data))
+                    or (
+                        prompt_price == 0.0
+                        and completion_price == 0.0
+                        and bool(pricing_data)
+                    )
                 )
 
                 if free_only and not is_free:
                     continue
 
-                pricing = ModelPricing(
-                    prompt_per_million=prompt_price,
-                    completion_per_million=completion_price,
-                ) if (prompt_price > 0.0 or completion_price > 0.0 or is_free) else None
+                pricing = (
+                    ModelPricing(
+                        prompt_per_million=prompt_price,
+                        completion_per_million=completion_price,
+                    )
+                    if (prompt_price > 0.0 or completion_price > 0.0 or is_free)
+                    else None
+                )
 
                 name = item.get("name", m_id) if isinstance(item, dict) else m_id
                 ctx_len = item.get("context_length") if isinstance(item, dict) else None

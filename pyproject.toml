@@ -1,7 +1,7 @@
 [project]
 name = "nexusai-client"
-version = "0.2.0"
-description = "A lightweight, unified asynchronous Python client for multi-provider AI APIs (Cerebras, Cohere, DeepSeek, Gemini, Groq, Mistral, Nvidia NIM, OpenRouter, OrcaRouter) with smart free-first fallback."
+version = "0.3.0"
+description = "A lightweight, unified asynchronous Python client for multi-provider AI APIs (Cerebras, Cohere, DeepSeek, Gemini, Groq, Mistral, Nvidia NIM, OpenRouter, OrcaRouter) with universal tool calling and smart free-first fallback."
 readme = "README_PYPI.md"
 authors = [
     { name = "Laurent VOLFF", email = "laurentvv@gmail.com" }
@@ -16,6 +16,9 @@ keywords = [
     "async",
     "streaming",
     "fallback",
+    "tool-calling",
+    "function-calling",
+    "agents",
     "openai",
     "gemini",
     "groq",
@@ -48,7 +51,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/laurentvv/NexusAI-Client"
 Repository = "https://github.com/laurentvv/NexusAI-Client"
-Documentation = "https://github.com/laurentvv/NexusAI-Client/blob/main/INTEGRATION_GUIDE.md"
+Documentation = "https://nexus-ai-client-doc.vercel.app/"
 Changelog = "https://github.com/laurentvv/NexusAI-Client/releases"
 Issues = "https://github.com/laurentvv/NexusAI-Client/issues"
 

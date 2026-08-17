@@ -41,7 +41,9 @@ PROVIDERS = [
 ]
 
 
-async def fetch_provider_models(provider_id: str, free_only: bool) -> tuple[str, list[ModelInfo]]:
+async def fetch_provider_models(
+    provider_id: str, free_only: bool
+) -> tuple[str, list[ModelInfo]]:
     """Fetch model list for a given provider."""
     try:
         async with AIGateway(provider=provider_id) as client:
@@ -58,8 +60,11 @@ def _filter_models(models: list[ModelInfo], search_term: str | None) -> list[Mod
         return models
     s = search_term.lower()
     return [
-        m for m in models
-        if s in m.id.lower() or s in m.name.lower() or (m.description and s in m.description.lower())
+        m
+        for m in models
+        if s in m.id.lower()
+        or s in m.name.lower()
+        or (m.description and s in m.description.lower())
     ]
 
 
@@ -81,12 +86,18 @@ def _display_models_table(label: str, models: list[ModelInfo], limit: int) -> No
 
     for m in models[:limit]:
         ctx = f"{m.context_length // 1000}k" if m.context_length else "N/A"
-        cost = m.pricing.format_pricing() if m.pricing else ("🟢 Free" if m.is_free else "💳 Standard Paid")
+        cost = (
+            m.pricing.format_pricing()
+            if m.pricing
+            else ("🟢 Free" if m.is_free else "💳 Standard Paid")
+        )
         badge = "🟢 " if m.is_free else "💳 "
         print(f"   {badge}{m.id:<38} | {ctx:<10} | {cost}")
 
     if len(models) > limit:
-        print(f"   ... and {len(models) - limit} more models (use --limit 50 or --search to refine)")
+        print(
+            f"   ... and {len(models) - limit} more models (use --limit 50 or --search to refine)"
+        )
 
 
 def _export_to_json(filepath: str, data: dict[str, Any]) -> None:
@@ -98,12 +109,23 @@ def _export_to_json(filepath: str, data: dict[str, Any]) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     """Configure CLI argument parser."""
-    parser = argparse.ArgumentParser(description="NexusAI-Client - Model Catalog Explorer")
-    parser.add_argument("--free", action="store_true", help="Display free-tier models only")
+    parser = argparse.ArgumentParser(
+        description="NexusAI-Client - Model Catalog Explorer"
+    )
+    parser.add_argument(
+        "--free", action="store_true", help="Display free-tier models only"
+    )
     parser.add_argument("--provider", type=str, default=None, help="Filter by provider")
     parser.add_argument("--search", type=str, default=None, help="Search by keyword")
-    parser.add_argument("--export", type=str, default=None, help="Export catalog to JSON file")
-    parser.add_argument("--limit", type=int, default=15, help="Max models displayed per provider (default: 15)")
+    parser.add_argument(
+        "--export", type=str, default=None, help="Export catalog to JSON file"
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=15,
+        help="Max models displayed per provider (default: 15)",
+    )
     return parser
 
 
@@ -112,9 +134,13 @@ async def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    target_providers = [p for p in PROVIDERS if not args.provider or p[0] == args.provider.lower()]
+    target_providers = [
+        p for p in PROVIDERS if not args.provider or p[0] == args.provider.lower()
+    ]
     if not target_providers:
-        print(f"❌ Unknown provider: '{args.provider}'. Available: {[p[0] for p in PROVIDERS]}")
+        print(
+            f"❌ Unknown provider: '{args.provider}'. Available: {[p[0] for p in PROVIDERS]}"
+        )
         return
 
     print("=" * 80)

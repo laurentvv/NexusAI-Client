@@ -24,6 +24,8 @@ from nexusai_client.models import (
     ChatMessage,
     ModelInfo,
     ModelPricing,
+    ToolCall,
+    ToolDefinition,
     UsageInfo,
 )
 from nexusai_client.providers.base import BaseAIProvider
@@ -79,6 +81,8 @@ class CohereProvider(BaseAIProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Generate single-turn text completion via Cohere V2 Chat API."""
@@ -93,6 +97,8 @@ class CohereProvider(BaseAIProvider):
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            tools=tools,
+            tool_choice=tool_choice,
             **kwargs,
         )
 
@@ -142,28 +148,48 @@ class CohereProvider(BaseAIProvider):
         try:
             response = await client.post(url, json=payload, headers=self._get_headers())
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
         try:
             data = response.json()
             content_list = data.get("message", {}).get("content", [])
-            text_parts = [c.get("text", "") for c in content_list if c.get("type") == "text" or "text" in c]
-            reply_text = "".join(text_parts) if text_parts else str(data.get("message", {}).get("content", ""))
+            text_parts = [
+                c.get("text", "")
+                for c in content_list
+                if c.get("type") == "text" or "text" in c
+            ]
+            reply_text = (
+                "".join(text_parts)
+                if text_parts
+                else str(data.get("message", {}).get("content", ""))
+            )
 
             usage_data = data.get("usage", {}).get("tokens", {})
             prompt_tokens = usage_data.get("input_tokens")
             completion_tokens = usage_data.get("output_tokens")
-            total_tokens = (prompt_tokens or 0) + (completion_tokens or 0) if prompt_tokens is not None else None
+            total_tokens = (
+                (prompt_tokens or 0) + (completion_tokens or 0)
+                if prompt_tokens is not None
+                else None
+            )
 
-            usage = UsageInfo(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            ) if total_tokens is not None else None
+            usage = (
+                UsageInfo(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                if total_tokens is not None
+                else None
+            )
 
             return AIResponse(
                 text=reply_text,
@@ -183,31 +209,37 @@ class CohereProvider(BaseAIProvider):
     @override
     async def chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
         """Send a multi-turn conversation to Cohere V2 Chat API."""
         target_model = model or self.default_model
-        formatted_messages = [
-            {"role": m.role if isinstance(m, ChatMessage) else m["role"], "content": m.content if isinstance(m, ChatMessage) else m["content"]}
-            for m in messages
-        ]
+        formatted_messages = self._normalize_messages(messages)
 
         payload: dict[str, Any] = {
             "model": target_model,
             "messages": formatted_messages,
             "temperature": temperature,
-            **kwargs,
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
+
+        normalized_tools = self._normalize_tools(tools)
+        if normalized_tools:
+            payload["tools"] = normalized_tools
+            if tool_choice is not None:
+                payload["tool_choice"] = tool_choice
+
+        payload.update(kwargs)
 
         client = await self.get_client()
         url = f"{self.base_url}/chat"
@@ -215,35 +247,94 @@ class CohereProvider(BaseAIProvider):
         try:
             response = await client.post(url, json=payload, headers=self._get_headers())
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
         self._handle_http_error(response)
 
         try:
             data = response.json()
             # Extract content from Cohere v2 format: data["message"]["content"][0]["text"]
-            content_list = data.get("message", {}).get("content", [])
-            text_parts = [c.get("text", "") for c in content_list if c.get("type") == "text" or "text" in c]
-            reply_text = "".join(text_parts) if text_parts else str(data.get("message", {}).get("content", ""))
+            msg_obj = data.get("message", {})
+            content_list = msg_obj.get("content", [])
+            text_parts = [
+                c.get("text", "")
+                for c in content_list
+                if isinstance(c, dict) and (c.get("type") == "text" or "text" in c)
+            ]
+            reply_text = (
+                "".join(text_parts)
+                if text_parts
+                else (
+                    msg_obj.get("content")
+                    if isinstance(msg_obj.get("content"), str)
+                    else ""
+                )
+            )
+            finish_reason = data.get("finish_reason")
+
+            # Parse tool calls in Cohere V2
+            raw_tool_calls = msg_obj.get("tool_calls", [])
+            parsed_tool_calls: list[ToolCall] = []
+            if raw_tool_calls and isinstance(raw_tool_calls, list):
+                for tc in raw_tool_calls:
+                    tc_id = tc.get("id", "")
+                    fn_data = tc.get("function", {})
+                    fn_name = fn_data.get("name", "")
+                    raw_args = fn_data.get("arguments", "")
+                    if isinstance(raw_args, dict):
+                        args_dict = raw_args
+                        raw_args_str = json.dumps(raw_args)
+                    elif isinstance(raw_args, str):
+                        raw_args_str = raw_args
+                        try:
+                            args_dict = json.loads(raw_args) if raw_args.strip() else {}
+                        except Exception:
+                            args_dict = {}
+                    else:
+                        raw_args_str = str(raw_args)
+                        args_dict = {}
+
+                    parsed_tool_calls.append(
+                        ToolCall(
+                            id=tc_id,
+                            name=fn_name,
+                            arguments=args_dict,
+                            raw_arguments=raw_args_str,
+                        )
+                    )
 
             usage_data = data.get("usage", {}).get("tokens", {})
             prompt_tokens = usage_data.get("input_tokens")
             completion_tokens = usage_data.get("output_tokens")
-            total_tokens = (prompt_tokens or 0) + (completion_tokens or 0) if prompt_tokens is not None else None
+            total_tokens = (
+                (prompt_tokens or 0) + (completion_tokens or 0)
+                if prompt_tokens is not None
+                else None
+            )
 
-            usage = UsageInfo(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            ) if total_tokens is not None else None
+            usage = (
+                UsageInfo(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+                if total_tokens is not None
+                else None
+            )
 
             return AIResponse(
-                text=reply_text,
+                text=reply_text or "",
                 provider=self.provider_name,
                 model=target_model,
                 usage=usage,
+                finish_reason=finish_reason,
+                tool_calls=parsed_tool_calls,
                 raw_response=data,
             )
         except Exception as exc:
@@ -283,7 +374,7 @@ class CohereProvider(BaseAIProvider):
     @override
     async def stream_chat(
         self,
-        messages: list[ChatMessage | dict[str, str]],
+        messages: list[ChatMessage | dict[str, Any]],
         *,
         model: str | None = None,
         temperature: float = 0.7,
@@ -292,10 +383,7 @@ class CohereProvider(BaseAIProvider):
     ) -> AsyncIterator[str]:
         """Stream generated tokens in real time from Cohere V2 Chat API via SSE."""
         target_model = model or self.default_model
-        formatted_messages = [
-            {"role": m.role if isinstance(m, ChatMessage) else m["role"], "content": m.content if isinstance(m, ChatMessage) else m["content"]}
-            for m in messages
-        ]
+        formatted_messages = self._normalize_messages(messages)
 
         payload: dict[str, Any] = {
             "model": target_model,
@@ -332,7 +420,11 @@ class CohereProvider(BaseAIProvider):
                     try:
                         chunk_json = json.loads(data_str)
                         # Cohere v2 streaming event: delta.message.content.text
-                        delta = chunk_json.get("delta", {}).get("message", {}).get("content", {})
+                        delta = (
+                            chunk_json.get("delta", {})
+                            .get("message", {})
+                            .get("content", {})
+                        )
                         if isinstance(delta, dict) and "text" in delta:
                             token = delta["text"]
                             if token:
@@ -343,9 +435,13 @@ class CohereProvider(BaseAIProvider):
                         continue
 
         except httpx.TimeoutException as exc:
-            raise APITimeoutError(provider=self.provider_name, timeout_seconds=self.timeout) from exc
+            raise APITimeoutError(
+                provider=self.provider_name, timeout_seconds=self.timeout
+            ) from exc
         except (httpx.NetworkError, httpx.ConnectError) as exc:
-            raise APIConnectionError(provider=self.provider_name, original_error=exc) from exc
+            raise APIConnectionError(
+                provider=self.provider_name, original_error=exc
+            ) from exc
 
     @override
     async def list_models(self, *, free_only: bool = False) -> list[ModelInfo]:
@@ -364,7 +460,9 @@ class CohereProvider(BaseAIProvider):
                     provider=self.provider_name,
                     is_free=True,
                     context_length=128_000,
-                    pricing=ModelPricing(prompt_per_million=2.5, completion_per_million=10.0),
+                    pricing=ModelPricing(
+                        prompt_per_million=2.5, completion_per_million=10.0
+                    ),
                     description="Cohere flagship reasoning and tool-use model.",
                 ),
                 ModelInfo(
@@ -373,7 +471,9 @@ class CohereProvider(BaseAIProvider):
                     provider=self.provider_name,
                     is_free=True,
                     context_length=128_000,
-                    pricing=ModelPricing(prompt_per_million=0.15, completion_per_million=0.60),
+                    pricing=ModelPricing(
+                        prompt_per_million=0.15, completion_per_million=0.60
+                    ),
                     description="Cohere fast scalable enterprise model.",
                 ),
             ]
@@ -400,7 +500,9 @@ class CohereProvider(BaseAIProvider):
                         provider=self.provider_name,
                         is_free=True,  # Trial Key free tier
                         context_length=ctx,
-                        pricing=ModelPricing(prompt_per_million=0.5, completion_per_million=1.5),
+                        pricing=ModelPricing(
+                            prompt_per_million=0.5, completion_per_million=1.5
+                        ),
                         description="Cohere Command foundation model for enterprise reasoning.",
                         raw_data=m,
                     )

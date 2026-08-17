@@ -21,6 +21,7 @@ class NexusAIError(Exception):
 # Configuration Errors
 # ---------------------------------------------------------
 
+
 class ConfigurationError(NexusAIError):
     """Raised when there is an issue with client or provider configuration."""
 
@@ -41,6 +42,7 @@ class MissingAPIKeyError(ConfigurationError):
 # Provider Lookup Errors
 # ---------------------------------------------------------
 
+
 class ProviderError(NexusAIError):
     """Base class for provider-related lookup or capability errors."""
 
@@ -48,7 +50,9 @@ class ProviderError(NexusAIError):
 class ProviderNotFoundError(ProviderError):
     """Raised when an unknown or unsupported provider is requested in AIGateway."""
 
-    def __init__(self, provider: str, available_providers: list[str] | None = None) -> None:
+    def __init__(
+        self, provider: str, available_providers: list[str] | None = None
+    ) -> None:
         message = f"Provider '{provider}' is not supported."
         if available_providers:
             message += f" Available providers are: {', '.join(available_providers)}"
@@ -64,6 +68,7 @@ class InvalidModelError(ProviderError):
 # ---------------------------------------------------------
 # Network & Connection Errors
 # ---------------------------------------------------------
+
 
 class NetworkError(NexusAIError):
     """Raised when an HTTP or socket-level network issue occurs."""
@@ -83,7 +88,9 @@ class APITimeoutError(NetworkError):
     """Raised when a request to the provider API times out."""
 
     def __init__(self, provider: str, timeout_seconds: float) -> None:
-        message = f"Request to provider '{provider}' timed out after {timeout_seconds:.1f}s."
+        message = (
+            f"Request to provider '{provider}' timed out after {timeout_seconds:.1f}s."
+        )
         super().__init__(message)
         self.provider = provider
         self.timeout_seconds = timeout_seconds
@@ -92,6 +99,7 @@ class APITimeoutError(NetworkError):
 # ---------------------------------------------------------
 # API Response & HTTP Errors
 # ---------------------------------------------------------
+
 
 class APIResponseError(NexusAIError):
     """Raised when the provider API returns a non-2xx HTTP status code."""

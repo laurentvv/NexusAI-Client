@@ -11,11 +11,14 @@
 
 <p align="center">
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/v/nexusai-client.svg?style=flat-square&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://nexus-ai-client-doc.vercel.app/"><img src="https://img.shields.io/badge/docs-nexus--ai--client--doc.vercel.app-00DC82.svg?style=flat-square&logo=vercel&logoColor=white" alt="Documentation Website"></a>
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/pyversions/nexusai-client.svg?style=flat-square&logo=python&logoColor=white" alt="Python versions"></a>
   <a href="https://pypi.org/project/nexusai-client/"><img src="https://img.shields.io/pypi/l/nexusai-client.svg?style=flat-square" alt="License MIT"></a>
   <a href="https://www.python-httpx.org/"><img src="https://img.shields.io/badge/engine-httpx_async-009688.svg?style=flat-square" alt="httpx"></a>
   <a href="https://peps.python.org/pep-0561/"><img src="https://img.shields.io/badge/typing-PEP_561_Strict-blue.svg?style=flat-square" alt="Typing"></a>
 </p>
+
+> 🌐 **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
 
 ---
 
@@ -28,6 +31,7 @@ Integrating multiple AI providers in modern Python applications usually requires
 - 🪶 **Zero Heavyweight Dependencies** — powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming** — stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
 - 🔄 **Zero-Cost-First Smart Fallback** — automatic progression from 100% free tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, OrcaRouter, Mistral) to paid backups with `AIGateway.auto_fallback()`.
+- 🛠️ **Universal Tool Calling / Function Calling** — define tools once (`ToolDefinition`, `FunctionDefinition`), parse structured function calls, and run multi-turn agent loops across all providers.
 - 🚀 **World-Record Hardware Accelerators** — native support for Groq LPUs and Cerebras CS-3 wafer-scale engines (2,000+ tokens/sec).
 - 🧠 **Enterprise Reasoning & Search Models** — native Cohere Command R+, DeepSeek R1, and Qwen 3.8 models.
 - 🎯 **Guaranteed JSON Outputs** — native `json_mode=True` across all supported providers.
@@ -288,6 +292,43 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### 7. Universal Tool Calling (Autonomous AI Agents)
+
+Equip AI models with callable tools across all providers (Groq, Cerebras, Mistral, DeepSeek, Gemini, Cohere, etc.):
+
+```python
+import asyncio
+from nexusai_client import AIGateway, ChatMessage, FunctionDefinition, ToolDefinition
+
+weather_tool = ToolDefinition(
+    function=FunctionDefinition(
+        name="get_current_weather",
+        description="Get current temperature and conditions for a given city.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "City name, e.g. Tokyo, Paris"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+            },
+            "required": ["location"],
+        },
+    )
+)
+
+async def main():
+    async with AIGateway.auto_fallback() as client:
+        messages = [ChatMessage(role="user", content="What is the weather in Tokyo?")]
+        response = await client.chat(messages=messages, tools=[weather_tool])
+
+        if response.has_tool_calls:
+            for call in response.tool_calls:
+                print(f"🔧 Tool Requested: {call.name}")
+                print(f"📦 Arguments: {call.arguments}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ---
 
 ## 🛡️ Strongly-Typed Exceptions
@@ -313,6 +354,7 @@ The package ships a `py.typed` marker (PEP 561): all types are available to your
 
 ## 📚 Resources
 
+- **Interactive Documentation Website:** [https://nexus-ai-client-doc.vercel.app/](https://nexus-ai-client-doc.vercel.app/)
 - **Source code:** [github.com/laurentvv/NexusAI-Client](https://github.com/laurentvv/NexusAI-Client)
 - **Full Integration Guide** (FastAPI, background workers, chat sessions): [INTEGRATION_GUIDE.md](https://github.com/laurentvv/NexusAI-Client/blob/main/INTEGRATION_GUIDE.md)
 - **Issue tracker:** [github.com/laurentvv/NexusAI-Client/issues](https://github.com/laurentvv/NexusAI-Client/issues)
