@@ -435,8 +435,11 @@ except NexusAIError as e:
 | :--- | :--- | :--- | :--- |
 | `"gemini_free"` | Google AI Studio | Free | `gemini-3.5-flash-lite` |
 | `"gemini_pro"` | Google AI Studio Pro | Paid | `gemini-3.1-pro-preview` |
-| `"groq"` (or `"groq_free"`) | Groq Cloud LPU | Free (30 RPM) | `llama-3.3-70b-versatile` |
+| `"groq"` (or `"groq_free"`) | Groq Cloud LPU | Free (30 RPM) | `openai/gpt-oss-120b` |
+| `"cerebras"` (or `"cerebras_free"`) | Cerebras CS-3 | Free (30 RPM) | `gpt-oss-120b` |
 | `"nvidia_free"` (or `"nvidia"`) | Nvidia NIM | Free (1,000 credits) | `meta/llama-3.1-8b-instruct` |
+| `"cohere"` (or `"cohere_free"`) | Cohere | Free Trial & Enterprise | `command-r-plus-08-2024` |
+| `"orcarouter"` (or `"orcarouter_free"`) | OrcaRouter | Free & Paid | `qwen/qwen3.8-27b-free` |
 | `"openrouter"` | OpenRouter | Free (`:free`) & Paid | `openrouter/free` |
 | `"mistral"` | Mistral AI | Free & Paid | `mistral-small-latest` |
 | `"deepseek"` | DeepSeek | Paid | `deepseek-chat` |

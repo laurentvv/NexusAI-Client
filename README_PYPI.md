@@ -28,10 +28,11 @@ Integrating multiple AI providers in modern Python applications usually requires
 
 **NexusAI-Client** solves this at the core:
 
+- 🔄 **Dynamic Model Management & Auto-Rotation**: Automatic failover on HTTP 404/400 (deprecated models), HTTP 429 rate limits, and timeouts across models and providers.
 - 🪶 **Zero Heavyweight Dependencies** — powered purely by `httpx` and `python-dotenv`.
 - ⚡ **Native Asynchronous & SSE Streaming** — stream responses token-by-token in real time via `stream_text()` and `stream_chat()`.
 - 🔄 **Zero-Cost-First Smart Fallback** — automatic progression from 100% free tiers (Gemini, Groq, Cerebras, Cohere, Nvidia, OpenRouter, OrcaRouter, Mistral) to paid backups with `AIGateway.auto_fallback()`.
-- 🛠️ **Universal Tool Calling / Function Calling** — define tools once (`ToolDefinition`, `FunctionDefinition`), parse structured function calls, and run multi-turn agent loops across all providers.
+- 🛠️ **Universal Tool Calling / Function Calling** — define tools once (`ToolDefinition`, `FunctionDefinition`), parse structured function calls, and run multi-turn agent loops across Groq, Cerebras, Mistral, DeepSeek, Gemini REST, Cohere V2, and Nvidia NIM.
 - 🚀 **World-Record Hardware Accelerators** — native support for Groq LPUs and Cerebras CS-3 wafer-scale engines (2,000+ tokens/sec).
 - 🧠 **Enterprise Reasoning & Search Models** — native Cohere Command R+, DeepSeek R1, and Qwen 3.8 models.
 - 🎯 **Guaranteed JSON Outputs** — native `json_mode=True` across all supported providers.
@@ -91,7 +92,7 @@ if __name__ == "__main__":
 | **DeepSeek** | `"deepseek"` | Paid | OpenAI Chat API | `deepseek-chat` | Real-time USD Balance (`GET /user/balance`) |
 | **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-3.5-flash-lite` | Auto-rotation 429 \| 15 RPM \| 500 RPD (Lite) / 20 RPD (Flash) |
 | **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-3.1-pro-preview` | Google Cloud Pay-as-you-go Billing |
-| **Groq** | `"groq"` (or `"groq_free"`) | Free (LPU) | OpenAI Chat API | `llama-3.3-70b-versatile` | Quotas: 30 RPM \| 14,400 RPD \| 30k TPM |
+| **Groq** | `"groq"` (or `"groq_free"`) | Free (LPU) | OpenAI Chat API | `openai/gpt-oss-120b` | Quotas: 30 RPM \| 14,400 RPD \| 30k TPM |
 | **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
 | **Nvidia NIM** | `"nvidia_free"` | Free (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1,000 Free GPU Inference Credits (NGC) |
 | **OpenRouter** | `"openrouter"` | Free & Paid | OpenAI Chat API | `openrouter/free` | 19 Free models live + 390 Commercial models |
