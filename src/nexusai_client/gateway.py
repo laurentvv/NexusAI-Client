@@ -527,6 +527,59 @@ class AIGateway:
         return cls.with_fallback(chain, timeout=timeout, **kwargs)
 
     @classmethod
+    def auto_fallback_free(
+        cls,
+        *,
+        timeout: float = 60.0,
+        **kwargs: Any,
+    ) -> FallbackGateway:
+        """Automatically create a FallbackGateway composed strictly of active zero-cost Free providers.
+
+        Orders providers strategically:
+        1. Google Gemini Free (with built-in model auto-rotation: 3.5 Lite -> 3.1 Lite -> 3.7 Flash -> ...)
+        2. Groq Free (LPU Llama 3.3 70B)
+        3. Cerebras Free (CS-3 gpt-oss-120b)
+        4. Nvidia NIM Free (Llama 3.1 8B)
+        5. OrcaRouter Free (qwen3.8-27b-free)
+        6. Mistral Free (mistral-small-latest)
+        7. Cohere Free Trial (command-r-plus)
+        8. OpenRouter Free (:free models)
+
+        Example:
+        -------
+        ```python
+        async with AIGateway.auto_fallback_free() as client:
+            res = await client.generate_text("Explain quantum computing.")
+        ```
+        """
+        free_candidates = [
+            "gemini_free",
+            "groq_free",
+            "cerebras_free",
+            "nvidia_free",
+            "orcarouter_free",
+            "mistral",
+            "cohere_free",
+            "openrouter",
+        ]
+        configured: list[str] = []
+        for p_name in free_candidates:
+            try:
+                prov = cls.create(p_name)
+                if prov.api_key:
+                    configured.append(p_name)
+            except (MissingAPIKeyError, Exception):
+                pass
+
+        if not configured:
+            raise MissingAPIKeyError(
+                provider="Any Free Provider",
+                env_var="GEMINI_FREE_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, NVIDIA_API_KEY, ORCAROUTER_API_KEY, etc.",
+                message="No configured free-tier AI providers found in .env.",
+            )
+        return cls.with_fallback(configured, timeout=timeout, **kwargs)
+
+    @classmethod
     def auto_fallback(
         cls,
         *,
