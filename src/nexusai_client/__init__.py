@@ -66,7 +66,7 @@ from nexusai_client.utils import (
     load_image_as_data_uri,
 )
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 __all__ = [
     # Gateway & Factory

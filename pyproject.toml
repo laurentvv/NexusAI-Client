@@ -1,6 +1,6 @@
 [project]
 name = "nexusai-client"
-version = "0.4.2"
+version = "0.4.3"
 description = "A lightweight, unified asynchronous Python client for multi-provider AI APIs (Cerebras, Cohere, DeepSeek, Gemini, Groq, Mistral, Nvidia NIM, OpenRouter, OrcaRouter) with universal tool calling and smart free-first fallback."
 readme = "README_PYPI.md"
 authors = [
