@@ -81,6 +81,7 @@ class ProviderDefaults:
     MISTRAL_VISION_MODEL: Final[str] = "pixtral-12b-2409"
     COHERE_VISION_MODEL: Final[str] = "c4ai-aya-vision-32b"
     OPENROUTER_VISION_MODEL: Final[str] = "google/gemini-2.0-flash-exp:free"
+    ORCAROUTER_VISION_MODEL: Final[str] = "qwen/qwen3.8-27b-free"
 
     # Global
     DEFAULT_TIMEOUT: Final[float] = 60.0
@@ -119,6 +120,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_PRO_BASE_URL",
         env_model_var="GEMINI_PRO_DEFAULT_MODEL",
+        env_vision_model_var="GEMINI_PRO_VISION_DEFAULT_MODEL",
     ),
     # Gemini Free
     "gemini_free": _ProviderMeta(
@@ -130,6 +132,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_FREE_BASE_URL",
         env_model_var="GEMINI_FREE_DEFAULT_MODEL",
+        env_vision_model_var="GEMINI_FREE_VISION_DEFAULT_MODEL",
     ),
     "gemini": _ProviderMeta(
         name="Gemini Free",
@@ -140,6 +143,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         fallback_env_key=ProviderDefaults.GEMINI_FALLBACK_ENV_KEY,
         env_base_url_var="GEMINI_FREE_BASE_URL",
         env_model_var="GEMINI_FREE_DEFAULT_MODEL",
+        env_vision_model_var="GEMINI_FREE_VISION_DEFAULT_MODEL",
     ),
     # Mistral
     "mistral": _ProviderMeta(
@@ -150,6 +154,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.MISTRAL_VISION_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
+        env_vision_model_var="MISTRAL_VISION_DEFAULT_MODEL",
     ),
     "mistral_free": _ProviderMeta(
         name="Mistral",
@@ -159,6 +164,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.MISTRAL_VISION_MODEL,
         env_base_url_var="MISTRAL_BASE_URL",
         env_model_var="MISTRAL_DEFAULT_MODEL",
+        env_vision_model_var="MISTRAL_VISION_DEFAULT_MODEL",
     ),
     # Cerebras (Wafer-Scale Free Inference)
     "cerebras": _ProviderMeta(
@@ -186,6 +192,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.COHERE_VISION_MODEL,
         env_base_url_var="COHERE_BASE_URL",
         env_model_var="COHERE_DEFAULT_MODEL",
+        env_vision_model_var="COHERE_VISION_DEFAULT_MODEL",
     ),
     "cohere_free": _ProviderMeta(
         name="Cohere",
@@ -195,6 +202,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.COHERE_VISION_MODEL,
         env_base_url_var="COHERE_BASE_URL",
         env_model_var="COHERE_DEFAULT_MODEL",
+        env_vision_model_var="COHERE_VISION_DEFAULT_MODEL",
     ),
     # Groq (Ultra-Fast LPU Free Tier)
     "groq": _ProviderMeta(
@@ -222,6 +230,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
+        env_vision_model_var="NVIDIA_VISION_DEFAULT_MODEL",
     ),
     "nvidia_free": _ProviderMeta(
         name="Nvidia",
@@ -231,6 +240,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
+        env_vision_model_var="NVIDIA_VISION_DEFAULT_MODEL",
     ),
     "nvidia_nim": _ProviderMeta(
         name="Nvidia",
@@ -240,6 +250,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.NVIDIA_VISION_MODEL,
         env_base_url_var="NVIDIA_BASE_URL",
         env_model_var="NVIDIA_DEFAULT_MODEL",
+        env_vision_model_var="NVIDIA_VISION_DEFAULT_MODEL",
     ),
     # OpenRouter
     "openrouter": _ProviderMeta(
@@ -250,6 +261,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.OPENROUTER_VISION_MODEL,
         env_base_url_var="OPENROUTER_BASE_URL",
         env_model_var="OPENROUTER_DEFAULT_MODEL",
+        env_vision_model_var="OPENROUTER_VISION_DEFAULT_MODEL",
     ),
     "openrouter_free": _ProviderMeta(
         name="OpenRouter",
@@ -259,6 +271,7 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         default_vision_model=ProviderDefaults.OPENROUTER_VISION_MODEL,
         env_base_url_var="OPENROUTER_BASE_URL",
         env_model_var="OPENROUTER_DEFAULT_MODEL",
+        env_vision_model_var="OPENROUTER_VISION_DEFAULT_MODEL",
     ),
     # OrcaRouter
     "orcarouter": _ProviderMeta(
@@ -266,16 +279,20 @@ _PROVIDER_META_REGISTRY: dict[str, _ProviderMeta] = {
         env_key=ProviderDefaults.ORCAROUTER_ENV_KEY,
         default_base_url=ProviderDefaults.ORCAROUTER_BASE_URL,
         default_model=ProviderDefaults.ORCAROUTER_MODEL,
+        default_vision_model=ProviderDefaults.ORCAROUTER_VISION_MODEL,
         env_base_url_var="ORCAROUTER_BASE_URL",
         env_model_var="ORCAROUTER_DEFAULT_MODEL",
+        env_vision_model_var="ORCAROUTER_VISION_DEFAULT_MODEL",
     ),
     "orcarouter_free": _ProviderMeta(
         name="OrcaRouter",
         env_key=ProviderDefaults.ORCAROUTER_ENV_KEY,
         default_base_url=ProviderDefaults.ORCAROUTER_BASE_URL,
         default_model=ProviderDefaults.ORCAROUTER_MODEL,
+        default_vision_model=ProviderDefaults.ORCAROUTER_VISION_MODEL,
         env_base_url_var="ORCAROUTER_BASE_URL",
         env_model_var="ORCAROUTER_DEFAULT_MODEL",
+        env_vision_model_var="ORCAROUTER_VISION_DEFAULT_MODEL",
     ),
 }
 
@@ -324,6 +341,7 @@ class Config:
         api_key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
+        vision_model: str | None = None,
         timeout: float | None = None,
         require_api_key: bool = True,
     ) -> ProviderConfig:
@@ -355,6 +373,9 @@ class Config:
 
         env_base = os.getenv(meta.env_base_url_var) if meta.env_base_url_var else None
         env_model = os.getenv(meta.env_model_var) if meta.env_model_var else None
+        env_vision_model = (
+            os.getenv(meta.env_vision_model_var) if meta.env_vision_model_var else None
+        )
 
         extra_headers: dict[str, str] | None = None
         if "openrouter" in norm:
@@ -369,7 +390,9 @@ class Config:
             api_key=resolved_key,
             base_url=base_url or env_base or meta.default_base_url,
             default_model=model or env_model or meta.default_model,
-            default_vision_model=meta.default_vision_model,
+            default_vision_model=vision_model
+            or env_vision_model
+            or meta.default_vision_model,
             timeout=resolved_timeout,
             extra_headers=extra_headers,
         )

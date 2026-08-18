@@ -801,6 +801,49 @@ async def test_orcarouter_generation_mocked() -> None:
             assert res.usage.total_tokens == 20
 
 
+@pytest.mark.asyncio
+async def test_orcarouter_vision_generation_mocked() -> None:
+    """Test OrcaRouter multimodal vision analysis with default Qwen 3.8 27B model."""
+    mock_payload = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "Visual description of the diagram from Qwen.",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"prompt_tokens": 45, "completion_tokens": 15, "total_tokens": 60},
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        json=mock_payload,
+        request=httpx.Request("POST", "https://api.orcarouter.ai/v1/chat/completions"),
+    )
+
+    async with AIGateway(provider="orcarouter_free", api_key="sk-orca-test") as client:
+        assert client.provider.default_vision_model == "qwen/qwen3.8-27b-free"
+        with patch.object(
+            httpx.AsyncClient, "post", new_callable=AsyncMock
+        ) as mock_post:
+            mock_post.return_value = mock_response
+            png_bytes = b"\x89PNG\r\n\x1a\n"
+            res = await client.analyze_image("Analyze this chart", png_bytes)
+            assert res.text == "Visual description of the diagram from Qwen."
+            assert res.provider == "orcarouter"
+            assert res.model == "qwen/qwen3.8-27b-free"
+            assert res.usage is not None
+            assert res.usage.total_tokens == 60
+
+
+def test_configured_vision_providers_includes_orcarouter() -> None:
+    """Verify that OrcaRouter is recognized as an active vision candidate."""
+    with patch.dict(os.environ, {"ORCAROUTER_API_KEY": "sk-orca-12345"}, clear=True):
+        vision_providers = AIGateway.get_configured_vision_providers()
+        assert "orcarouter_free" in vision_providers
+
+
 def test_tool_calling_models_and_serialization() -> None:
     """Test ToolCall, FunctionDefinition, ToolDefinition and ChatMessage serialization."""
     tc = ToolCall(
