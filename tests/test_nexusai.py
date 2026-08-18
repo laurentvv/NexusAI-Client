@@ -1215,9 +1215,13 @@ async def test_fallback_gateway_with_tools_mocked() -> None:
         )
     ]
 
+    def mock_post_dispatcher(url: str, *args: Any, **kwargs: Any) -> httpx.Response:
+        if "groq.com" in str(url):
+            return mock_err_response
+        return mock_success_response
+
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
-        # First call (Groq) fails with 429, Second call (Gemini) succeeds
-        mock_post.side_effect = [mock_err_response, mock_success_response]
+        mock_post.side_effect = mock_post_dispatcher
 
         res = await fallback_gw.generate_text("Search for NexusAI", tools=tools)
 
@@ -1349,4 +1353,137 @@ async def test_auto_fallback_free_gateway() -> None:
         assert "gemini_free" in provider_names
         assert "groq" in provider_names
         assert "cerebras" in provider_names
+
+
+@pytest.mark.asyncio
+async def test_groq_dynamic_model_rotation_on_404() -> None:
+    """Test Groq auto-rotates to active model when configured model returns 404."""
+    mock_404_response = httpx.Response(
+        status_code=404,
+        json={
+            "error": {
+                "message": "The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.",
+                "type": "invalid_request_error",
+                "code": "model_not_found",
+            }
+        },
+        request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+    )
+    mock_success_response = httpx.Response(
+        status_code=200,
+        json={
+            "id": "chatcmpl-test",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Hello from auto-rotated model!"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18},
+        },
+        request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions"),
+    )
+
+    client = GroqProvider(
+        api_key="test-groq-key",
+        model="llama-3.3-70b-versatile",
+        fallback_models=["openai/gpt-oss-120b"],
+        auto_rotate_models=True,
+    )
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = [mock_404_response, mock_success_response]
+
+        res = await client.generate_text("Hi!")
+        assert res.text == "Hello from auto-rotated model!"
+        assert res.model == "openai/gpt-oss-120b"
+        assert mock_post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_openai_compat_dynamic_discovery_when_candidates_fail() -> None:
+    """Test OpenAICompatibleProvider queries /models when all configured models fail."""
+    mock_404_response = httpx.Response(
+        status_code=404,
+        json={"error": {"message": "Model not found", "code": "model_not_found"}},
+        request=httpx.Request("POST", "https://api.example.com/v1/chat/completions"),
+    )
+    mock_models_response = httpx.Response(
+        status_code=200,
+        json={
+            "data": [
+                {"id": "whisper-audio-v1"},
+                {"id": "meta-llama-guard-2"},
+                {"id": "qwen3.6-27b"},
+            ]
+        },
+        request=httpx.Request("GET", "https://api.example.com/v1/models"),
+    )
+    mock_success_response = httpx.Response(
+        status_code=200,
+        json={
+            "choices": [{"message": {"role": "assistant", "content": "Discovered model works!"}}]
+        },
+        request=httpx.Request("POST", "https://api.example.com/v1/chat/completions"),
+    )
+
+    from nexusai_client.providers.openai_compat import OpenAICompatibleProvider
+
+    class CustomProvider(OpenAICompatibleProvider):
+        @property
+        def provider_name(self) -> str:
+            return "custom_ai"
+
+    client = CustomProvider(
+        api_key="test-key",
+        base_url="https://api.example.com/v1",
+        default_model="obsolete-model",
+        fallback_models=[],
+        auto_rotate_models=True,
+    )
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        with patch.object(httpx.AsyncClient, "get", new_callable=AsyncMock) as mock_get:
+            mock_post.side_effect = [mock_404_response, mock_success_response]
+            mock_get.return_value = mock_models_response
+
+            res = await client.generate_text("Hello!")
+            assert res.text == "Discovered model works!"
+            assert res.model == "qwen3.6-27b"
+            assert mock_get.call_count == 1
+            assert mock_post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_cohere_dynamic_model_rotation_on_429() -> None:
+    """Test Cohere auto-rotates models on rate limits."""
+    mock_429 = httpx.Response(
+        status_code=429,
+        json={"message": "Trial tier rate limit exceeded"},
+        request=httpx.Request("POST", "https://api.cohere.com/v2/chat"),
+    )
+    mock_success = httpx.Response(
+        status_code=200,
+        json={
+            "message": {"content": [{"type": "text", "text": "Answer from Cohere fallback model"}]},
+            "finish_reason": "COMPLETE",
+        },
+        request=httpx.Request("POST", "https://api.cohere.com/v2/chat"),
+    )
+
+    client = CohereProvider(
+        api_key="test-cohere-key",
+        model="command-r-plus-08-2024",
+        fallback_models=["command-r-08-2024"],
+        auto_rotate_models=True,
+    )
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = [mock_429, mock_success]
+
+        res = await client.generate_text("Explain quantum computing")
+        assert res.text == "Answer from Cohere fallback model"
+        assert res.model == "command-r-08-2024"
+        assert mock_post.call_count == 2
 

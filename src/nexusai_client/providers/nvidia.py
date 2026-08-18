@@ -27,6 +27,9 @@ class NvidiaProvider(OpenAICompatibleProvider):
         base_url: str | None = None,
         model: str | None = None,
         timeout: float | None = None,
+        fallback_models: list[str] | tuple[str, ...] | None = None,
+        fallback_vision_models: list[str] | tuple[str, ...] | None = None,
+        auto_rotate_models: bool = True,
         **kwargs: Any,
     ) -> None:
         config = Config.get_provider_config(
@@ -36,12 +39,25 @@ class NvidiaProvider(OpenAICompatibleProvider):
             model=model or ProviderDefaults.NVIDIA_MODEL,
             timeout=timeout,
         )
+        resolved_fallbacks = (
+            fallback_models
+            if fallback_models is not None
+            else list(ProviderDefaults.NVIDIA_FALLBACK_MODELS)
+        )
+        resolved_vision_fallbacks = (
+            fallback_vision_models
+            if fallback_vision_models is not None
+            else list(ProviderDefaults.NVIDIA_VISION_FALLBACK_MODELS)
+        )
         super().__init__(
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
             default_vision_model=config.default_vision_model,
             timeout=config.timeout,
+            fallback_models=resolved_fallbacks,
+            fallback_vision_models=resolved_vision_fallbacks,
+            auto_rotate_models=auto_rotate_models,
             **kwargs,
         )
 
