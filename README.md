@@ -302,6 +302,10 @@ async def main():
                 print(f"📦 Arguments: {call.arguments}")
                 # Execute your local Python function and return result back to agent loop!
 
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ### 8. Intelligent Gemini Free Model Rotation (Auto 429 Quota Failover)
 
 Google AI Studio Free tier enforces separate daily quotas per model (e.g. 500 RPD on Flash Lite, 20 RPD on Flash, 14.4k RPD on Gemma 4). `GeminiFreeProvider` automatically cascades across 11 free models when a rate limit (`HTTP 429`) is encountered:
