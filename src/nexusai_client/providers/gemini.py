@@ -18,6 +18,7 @@ from nexusai_client.exceptions import (
     APIConnectionError,
     APIResponseError,
     APITimeoutError,
+    ProviderServerError,
     RateLimitError,
 )
 from nexusai_client.models import (
@@ -431,6 +432,15 @@ class GeminiBaseProvider(BaseAIProvider):
                     last_error = exc
                     continue
                 raise
+            except (APITimeoutError, ProviderServerError) as exc:
+                if self.auto_rotate_models:
+                    self._mark_model_cooldown(candidate, duration=60.0)
+                    logger.warning(
+                        f"Gemini Vision model '{candidate}' failed ({exc}). Trying next candidate..."
+                    )
+                    last_error = exc
+                    continue
+                raise
 
         if last_error:
             raise last_error
@@ -608,6 +618,15 @@ class GeminiBaseProvider(BaseAIProvider):
                     self._mark_model_cooldown(candidate, duration=3600.0)
                     logger.warning(
                         f"Gemini model '{candidate}' not available. Rotating..."
+                    )
+                    last_error = exc
+                    continue
+                raise
+            except (APITimeoutError, ProviderServerError) as exc:
+                if self.auto_rotate_models:
+                    self._mark_model_cooldown(candidate, duration=60.0)
+                    logger.warning(
+                        f"Gemini model '{candidate}' failed ({exc}). Trying next candidate..."
                     )
                     last_error = exc
                     continue

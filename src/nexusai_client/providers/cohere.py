@@ -7,16 +7,20 @@ Supports Command R+, Command R, Command Light, Aya, structured outputs, and toke
 from __future__ import annotations
 
 import json
+import logging
+import time
 from collections.abc import AsyncIterator
 from typing import Any, override
 
 import httpx
 
-from nexusai_client.config import Config
+from nexusai_client.config import Config, ProviderDefaults
 from nexusai_client.exceptions import (
     APIConnectionError,
     APIResponseError,
     APITimeoutError,
+    ProviderServerError,
+    RateLimitError,
 )
 from nexusai_client.models import (
     AccountInfo,
@@ -30,9 +34,11 @@ from nexusai_client.models import (
 )
 from nexusai_client.providers.base import BaseAIProvider
 
+logger = logging.getLogger("nexusai_client")
+
 
 class CohereProvider(BaseAIProvider):
-    """Cohere AI Provider (Enterprise LLMs & Free Trial Tier)."""
+    """Cohere AI Provider (Enterprise LLMs & Free Trial Tier) with dynamic model rotation."""
 
     provider_name = "cohere"
 
@@ -44,14 +50,28 @@ class CohereProvider(BaseAIProvider):
         model: str | None = None,
         default_model: str | None = None,
         timeout: float | None = None,
+        fallback_models: list[str] | tuple[str, ...] | None = None,
+        fallback_vision_models: list[str] | tuple[str, ...] | None = None,
+        auto_rotate_models: bool = True,
+        cooldown_seconds: float = 60.0,
         **kwargs: Any,
     ) -> None:
         config = Config.get_provider_config(
             "cohere",
             api_key=api_key,
             base_url=base_url,
-            model=model or default_model,
+            model=model or default_model or ProviderDefaults.COHERE_MODEL,
             timeout=timeout,
+        )
+        resolved_fallbacks = (
+            fallback_models
+            if fallback_models is not None
+            else list(ProviderDefaults.COHERE_FALLBACK_MODELS)
+        )
+        resolved_vision_fallbacks = (
+            fallback_vision_models
+            if fallback_vision_models is not None
+            else list(ProviderDefaults.COHERE_VISION_FALLBACK_MODELS)
         )
         super().__init__(
             api_key=config.api_key,
@@ -61,6 +81,48 @@ class CohereProvider(BaseAIProvider):
             timeout=config.timeout,
             **kwargs,
         )
+        self.fallback_models: list[str] = list(resolved_fallbacks)
+        self.fallback_vision_models: list[str] = list(resolved_vision_fallbacks)
+        self.auto_rotate_models: bool = auto_rotate_models
+        self.cooldown_seconds: float = cooldown_seconds
+        self._model_cooldowns: dict[str, float] = {}
+
+    def _mark_model_cooldown(
+        self, model: str, duration: float | None = None
+    ) -> None:
+        """Mark a model as temporarily in cooldown."""
+        cd = duration if duration is not None else self.cooldown_seconds
+        self._model_cooldowns[model] = time.monotonic() + cd
+
+    def _get_candidate_models(
+        self, requested_model: str | None, *, is_vision: bool = False
+    ) -> list[str]:
+        """Order candidate models, placing available models before models in cooldown."""
+        primary = requested_model or (
+            self.default_vision_model if is_vision else self.default_model
+        )
+        fallbacks = (
+            self.fallback_vision_models if is_vision else self.fallback_models
+        )
+
+        ordered: list[str] = [primary] if primary else []
+        if self.auto_rotate_models:
+            for m in fallbacks:
+                if m not in ordered:
+                    ordered.append(m)
+
+        now = time.monotonic()
+        available: list[str] = []
+        in_cooldown: list[str] = []
+
+        for m in ordered:
+            cooldown_until = self._model_cooldowns.get(m, 0.0)
+            if cooldown_until > now:
+                in_cooldown.append(m)
+            else:
+                available.append(m)
+
+        return available + in_cooldown
 
     def _get_headers(self) -> dict[str, str]:
         """Construct standard HTTP headers for Cohere API."""
@@ -102,23 +164,21 @@ class CohereProvider(BaseAIProvider):
             **kwargs,
         )
 
-    @override
-    async def analyze_image(
+    async def _single_analyze_image(
         self,
+        *,
+        model: str,
         prompt: str,
         image: Any,
-        *,
         system_prompt: str | None = None,
-        model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int | None = None,
         json_mode: bool = False,
         **kwargs: Any,
     ) -> AIResponse:
-        """Analyze an image or document using Cohere multimodal models (e.g. Aya Vision)."""
+        """Execute a single multimodal request to Cohere API."""
         from nexusai_client.utils import load_image_as_data_uri
 
-        target_model = model or self.default_vision_model or "c4ai-aya-vision-32b"
         data_uri = load_image_as_data_uri(image)
 
         user_content: list[dict[str, Any]] = [
@@ -132,7 +192,7 @@ class CohereProvider(BaseAIProvider):
         messages_payload.append({"role": "user", "content": user_content})
 
         payload: dict[str, Any] = {
-            "model": target_model,
+            "model": model,
             "messages": messages_payload,
             "temperature": temperature,
             **kwargs,
@@ -194,7 +254,7 @@ class CohereProvider(BaseAIProvider):
             return AIResponse(
                 text=reply_text,
                 provider=self.provider_name,
-                model=target_model,
+                model=model,
                 usage=usage,
                 raw_response=data,
             )
@@ -207,11 +267,69 @@ class CohereProvider(BaseAIProvider):
             ) from exc
 
     @override
-    async def chat(
+    async def analyze_image(
         self,
-        messages: list[ChatMessage | dict[str, Any]],
+        prompt: str,
+        image: Any,
         *,
+        system_prompt: str | None = None,
         model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Analyze an image or document using Cohere multimodal models with dynamic rotation."""
+        candidates = self._get_candidate_models(model, is_vision=True)
+        last_error: Exception | None = None
+
+        for candidate in candidates:
+            try:
+                return await self._single_analyze_image(
+                    model=candidate,
+                    prompt=prompt,
+                    image=image,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    **kwargs,
+                )
+            except RateLimitError as exc:
+                self._mark_model_cooldown(candidate)
+                logger.warning(
+                    f"{self.provider_name}: Vision model '{candidate}' rate limited (429). Rotating..."
+                )
+                last_error = exc
+                continue
+            except APIResponseError as exc:
+                if exc.status_code in (400, 404):
+                    self._mark_model_cooldown(candidate, duration=3600.0)
+                    logger.warning(
+                        f"{self.provider_name}: Vision model '{candidate}' unavailable ({exc}). Rotating..."
+                    )
+                    last_error = exc
+                    continue
+                raise
+            except (APITimeoutError, ProviderServerError) as exc:
+                if self.auto_rotate_models:
+                    self._mark_model_cooldown(candidate, duration=60.0)
+                    logger.warning(
+                        f"{self.provider_name}: Vision model '{candidate}' failed ({exc}). Trying next..."
+                    )
+                    last_error = exc
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"No candidate vision models available in provider '{self.provider_name}'.")
+
+    async def _single_chat(
+        self,
+        *,
+        model: str,
+        messages: list[ChatMessage | dict[str, Any]],
         temperature: float = 0.7,
         max_tokens: int | None = None,
         json_mode: bool = False,
@@ -219,12 +337,11 @@ class CohereProvider(BaseAIProvider):
         tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AIResponse:
-        """Send a multi-turn conversation to Cohere V2 Chat API."""
-        target_model = model or self.default_model
+        """Send a single conversation request to Cohere V2 Chat API."""
         formatted_messages = self._normalize_messages(messages)
 
         payload: dict[str, Any] = {
-            "model": target_model,
+            "model": model,
             "messages": formatted_messages,
             "temperature": temperature,
         }
@@ -259,7 +376,6 @@ class CohereProvider(BaseAIProvider):
 
         try:
             data = response.json()
-            # Extract content from Cohere v2 format: data["message"]["content"][0]["text"]
             msg_obj = data.get("message", {})
             content_list = msg_obj.get("content", [])
             text_parts = [
@@ -331,7 +447,7 @@ class CohereProvider(BaseAIProvider):
             return AIResponse(
                 text=reply_text or "",
                 provider=self.provider_name,
-                model=target_model,
+                model=model,
                 usage=usage,
                 finish_reason=finish_reason,
                 tool_calls=parsed_tool_calls,
@@ -344,6 +460,65 @@ class CohereProvider(BaseAIProvider):
                 response_body=response.text,
                 message=f"Failed to parse Cohere V2 response: {exc}",
             ) from exc
+
+    @override
+    async def chat(
+        self,
+        messages: list[ChatMessage | dict[str, Any]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        tools: list[ToolDefinition | dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Send a multi-turn conversation to Cohere V2 Chat API with dynamic model rotation."""
+        candidates = self._get_candidate_models(model, is_vision=False)
+        last_error: Exception | None = None
+
+        for candidate in candidates:
+            try:
+                return await self._single_chat(
+                    model=candidate,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    **kwargs,
+                )
+            except RateLimitError as exc:
+                self._mark_model_cooldown(candidate)
+                logger.warning(
+                    f"{self.provider_name}: Model '{candidate}' rate limited (429). Rotating..."
+                )
+                last_error = exc
+                continue
+            except APIResponseError as exc:
+                if exc.status_code in (400, 404):
+                    self._mark_model_cooldown(candidate, duration=3600.0)
+                    logger.warning(
+                        f"{self.provider_name}: Model '{candidate}' unavailable ({exc}). Rotating..."
+                    )
+                    last_error = exc
+                    continue
+                raise
+            except (APITimeoutError, ProviderServerError) as exc:
+                if self.auto_rotate_models:
+                    self._mark_model_cooldown(candidate, duration=60.0)
+                    logger.warning(
+                        f"{self.provider_name}: Model '{candidate}' failed ({exc}). Trying next..."
+                    )
+                    last_error = exc
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"No candidate models available in provider '{self.provider_name}'.")
 
     @override
     async def stream_text(

@@ -25,11 +25,20 @@ class ProviderDefaults:
     # DeepSeek
     DEEPSEEK_BASE_URL: Final[str] = "https://api.deepseek.com"
     DEEPSEEK_MODEL: Final[str] = "deepseek-chat"
+    DEEPSEEK_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "deepseek-chat",
+        "deepseek-reasoner",
+    )
     DEEPSEEK_ENV_KEY: Final[str] = "DEEPSEEK_API_KEY"
 
     # Gemini Pro (Paid API / Vertex / Google AI Studio)
     GEMINI_PRO_BASE_URL: Final[str] = "https://generativelanguage.googleapis.com/v1beta"
     GEMINI_PRO_MODEL: Final[str] = "gemini-3.1-pro-preview"
+    GEMINI_PRO_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash-lite",
+        "gemini-3.7-flash",
+    )
     GEMINI_PRO_ENV_KEY: Final[str] = "GEMINI_PRO_API_KEY"
 
     # Gemini Free (Google AI Studio Free Tier)
@@ -56,36 +65,80 @@ class ProviderDefaults:
     # Mistral (Free tier / La Plateforme)
     MISTRAL_BASE_URL: Final[str] = "https://api.mistral.ai/v1"
     MISTRAL_MODEL: Final[str] = "mistral-small-latest"
+    MISTRAL_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "mistral-small-latest",
+        "mistral-large-latest",
+        "codestral-latest",
+        "open-mistral-nemo",
+    )
     MISTRAL_ENV_KEY: Final[str] = "MISTRAL_API_KEY"
 
     # Nvidia (Free NIM API)
     NVIDIA_BASE_URL: Final[str] = "https://integrate.api.nvidia.com/v1"
     NVIDIA_MODEL: Final[str] = "meta/llama-3.1-8b-instruct"
+    NVIDIA_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "meta/llama-3.1-8b-instruct",
+        "meta/llama-3.3-70b-instruct",
+        "deepseek-ai/deepseek-r1",
+        "meta/llama-3.2-3b-instruct",
+    )
     NVIDIA_ENV_KEY: Final[str] = "NVIDIA_API_KEY"
 
     # OpenRouter (Free tier models)
     OPENROUTER_BASE_URL: Final[str] = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: Final[str] = "openrouter/free"
+    OPENROUTER_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "openrouter/free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+    )
     OPENROUTER_ENV_KEY: Final[str] = "OPENROUTER_API_KEY"
 
     # OrcaRouter (Multi-provider Zero-Margin Gateway with Free Models)
     ORCAROUTER_BASE_URL: Final[str] = "https://api.orcarouter.ai/v1"
     ORCAROUTER_MODEL: Final[str] = "qwen/qwen3.8-27b-free"
+    ORCAROUTER_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "qwen/qwen3.8-27b-free",
+        "deepseek/deepseek-r1-distill-qwen-32b-free",
+        "meta-llama/llama-3.3-70b-instruct-free",
+    )
     ORCAROUTER_ENV_KEY: Final[str] = "ORCAROUTER_API_KEY"
 
     # Groq (Ultra-Fast Free LPU Tier)
     GROQ_BASE_URL: Final[str] = "https://api.groq.com/openai/v1"
-    GROQ_MODEL: Final[str] = "llama-3.3-70b-versatile"
+    GROQ_MODEL: Final[str] = "openai/gpt-oss-120b"
+    GROQ_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.6-27b",
+        "groq/compound",
+        "groq/compound-mini",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+    )
     GROQ_ENV_KEY: Final[str] = "GROQ_API_KEY"
 
     # Cerebras (Wafer-Scale Ultra-Fast Inference)
     CEREBRAS_BASE_URL: Final[str] = "https://api.cerebras.ai/v1"
     CEREBRAS_MODEL: Final[str] = "gpt-oss-120b"
+    CEREBRAS_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "gpt-oss-120b",
+        "gemma-4-31b",
+        "llama-3.3-70b",
+        "llama3.1-70b",
+        "llama3.1-8b",
+    )
     CEREBRAS_ENV_KEY: Final[str] = "CEREBRAS_API_KEY"
 
     # Cohere (Enterprise & Free Trial Tier)
     COHERE_BASE_URL: Final[str] = "https://api.cohere.com/v2"
     COHERE_MODEL: Final[str] = "command-r-plus-08-2024"
+    COHERE_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "command-r-plus-08-2024",
+        "command-r-08-2024",
+        "command-r-plus",
+        "command-r",
+    )
     COHERE_ENV_KEY: Final[str] = "COHERE_API_KEY"
 
     # Default Vision Models for Multimodal Analysis
@@ -100,10 +153,28 @@ class ProviderDefaults:
         "gemini-2.5-flash",
     )
     NVIDIA_VISION_MODEL: Final[str] = "meta/llama-3.2-11b-vision-instruct"
+    NVIDIA_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "meta/llama-3.2-11b-vision-instruct",
+        "meta/llama-3.2-90b-vision-instruct",
+    )
     MISTRAL_VISION_MODEL: Final[str] = "pixtral-12b-2409"
+    MISTRAL_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "pixtral-12b-2409",
+        "pixtral-large-latest",
+    )
     COHERE_VISION_MODEL: Final[str] = "c4ai-aya-vision-32b"
+    COHERE_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "c4ai-aya-vision-32b",
+        "c4ai-aya-vision-8b",
+    )
     OPENROUTER_VISION_MODEL: Final[str] = "google/gemini-2.0-flash-exp:free"
+    OPENROUTER_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "google/gemini-2.0-flash-exp:free",
+    )
     ORCAROUTER_VISION_MODEL: Final[str] = "qwen/qwen3.8-27b-free"
+    ORCAROUTER_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "qwen/qwen3.8-27b-free",
+    )
 
     # Global
     DEFAULT_TIMEOUT: Final[float] = 60.0

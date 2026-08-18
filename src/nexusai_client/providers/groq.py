@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from typing import Any, override
 
-from nexusai_client.config import Config
+from nexusai_client.config import Config, ProviderDefaults
 from nexusai_client.models import AccountInfo, ModelInfo, ModelPricing
 from nexusai_client.providers.openai_compat import OpenAICompatibleProvider
 
 
 class GroqProvider(OpenAICompatibleProvider):
-    """Groq AI Provider (Ultra-Fast LPU Free & Developer Tier)."""
+    """Groq AI Provider (Ultra-Fast LPU Free & Developer Tier) with dynamic model rotation."""
 
     provider_name = "groq"
 
@@ -26,14 +26,21 @@ class GroqProvider(OpenAICompatibleProvider):
         model: str | None = None,
         default_model: str | None = None,
         timeout: float | None = None,
+        fallback_models: list[str] | tuple[str, ...] | None = None,
+        auto_rotate_models: bool = True,
         **kwargs: Any,
     ) -> None:
         config = Config.get_provider_config(
             "groq",
             api_key=api_key,
             base_url=base_url,
-            model=model or default_model,
+            model=model or default_model or ProviderDefaults.GROQ_MODEL,
             timeout=timeout,
+        )
+        resolved_fallbacks = (
+            fallback_models
+            if fallback_models is not None
+            else list(ProviderDefaults.GROQ_FALLBACK_MODELS)
         )
         super().__init__(
             api_key=config.api_key,
@@ -42,6 +49,8 @@ class GroqProvider(OpenAICompatibleProvider):
             default_vision_model=config.default_vision_model,
             timeout=config.timeout,
             extra_headers=config.extra_headers,
+            fallback_models=resolved_fallbacks,
+            auto_rotate_models=auto_rotate_models,
             **kwargs,
         )
 

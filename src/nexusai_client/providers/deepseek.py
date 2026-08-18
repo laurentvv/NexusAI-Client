@@ -54,6 +54,8 @@ class DeepSeekProvider(OpenAICompatibleProvider):
         base_url: str | None = None,
         model: str | None = None,
         timeout: float | None = None,
+        fallback_models: list[str] | tuple[str, ...] | None = None,
+        auto_rotate_models: bool = True,
         **kwargs: Any,
     ) -> None:
         config = Config.get_provider_config(
@@ -63,11 +65,18 @@ class DeepSeekProvider(OpenAICompatibleProvider):
             model=model or ProviderDefaults.DEEPSEEK_MODEL,
             timeout=timeout,
         )
+        resolved_fallbacks = (
+            fallback_models
+            if fallback_models is not None
+            else list(ProviderDefaults.DEEPSEEK_FALLBACK_MODELS)
+        )
         super().__init__(
             api_key=config.api_key,
             base_url=config.base_url,
             default_model=config.default_model,
             timeout=config.timeout,
+            fallback_models=resolved_fallbacks,
+            auto_rotate_models=auto_rotate_models,
             **kwargs,
         )
 
