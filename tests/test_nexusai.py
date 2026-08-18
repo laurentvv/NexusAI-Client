@@ -670,7 +670,7 @@ async def test_analyze_image_gemini_mocked() -> None:
             res = await client.analyze_image("Describe this image", png_bytes)
             assert res.text == "A futuristic glowing banner."
             assert res.provider == "gemini_free"
-            assert res.model == "gemini-2.5-flash"
+            assert res.model == "gemini-3.5-flash-lite"
             assert res.usage is not None
             assert res.usage.total_tokens == 58
 
@@ -1225,3 +1225,128 @@ async def test_fallback_gateway_with_tools_mocked() -> None:
         assert res.provider == "gemini_free"
         assert res.tool_calls[0].name == "search_web"
         assert res.tool_calls[0].arguments == {"query": "NexusAI python client"}
+
+
+@pytest.mark.asyncio
+async def test_gemini_free_model_rotation_on_429() -> None:
+    """Test that GeminiFreeProvider automatically rotates to the next model when 429 occurs."""
+    mock_429 = httpx.Response(
+        status_code=429,
+        json={
+            "error": {
+                "message": "Resource has been exhausted (e.g. check quota).",
+                "status": "RESOURCE_EXHAUSTED",
+            }
+        },
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        ),
+    )
+    mock_success = httpx.Response(
+        status_code=200,
+        json={
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": "Hello from rotated model!"}],
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        },
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        ),
+    )
+
+    client = GeminiFreeProvider(
+        api_key="test-key",
+        model="gemini-3.5-flash-lite",
+        fallback_models=["gemini-3.1-flash-lite", "gemini-2.5-flash"],
+        auto_rotate_models=True,
+    )
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = [mock_429, mock_success]
+
+        response = await client.generate_text("Hello")
+
+        assert response.text == "Hello from rotated model!"
+        assert response.model == "gemini-3.1-flash-lite"
+        assert mock_post.call_count == 2
+        # Verify gemini-3.5-flash-lite is now in cooldown
+        assert "gemini-3.5-flash-lite" in client._model_cooldowns
+
+
+@pytest.mark.asyncio
+async def test_gemini_free_vision_model_rotation_on_429() -> None:
+    """Test that Gemini Vision automatically rotates to next vision model on 429."""
+    mock_429 = httpx.Response(
+        status_code=429,
+        text="Rate limit exceeded",
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        ),
+    )
+    mock_success = httpx.Response(
+        status_code=200,
+        json={
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": "Chart describes stock gains."}],
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        },
+        request=httpx.Request(
+            "POST",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        ),
+    )
+
+    client = GeminiFreeProvider(
+        api_key="test-key",
+        model="gemini-3.5-flash-lite",
+        fallback_vision_models=["gemini-3.1-flash-lite"],
+        auto_rotate_models=True,
+    )
+
+    # 1x1 transparent PNG bytes
+    png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = [mock_429, mock_success]
+
+        response = await client.analyze_image("Explain image", png_bytes)
+
+        assert response.text == "Chart describes stock gains."
+        assert response.model == "gemini-3.1-flash-lite"
+        assert mock_post.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_auto_fallback_free_gateway() -> None:
+    """Test AIGateway.auto_fallback_free() constructor."""
+    with patch.dict(
+        os.environ,
+        {
+            "GEMINI_FREE_API_KEY": "key-gemini",
+            "GROQ_API_KEY": "key-groq",
+            "CEREBRAS_API_KEY": "key-cerebras",
+        },
+        clear=True,
+    ):
+        gw = AIGateway.auto_fallback_free()
+        assert isinstance(gw, FallbackGateway)
+        provider_names = [p.provider_name for p in gw._provider_chain]
+        assert "gemini_free" in provider_names
+        assert "groq" in provider_names
+        assert "cerebras" in provider_names
+

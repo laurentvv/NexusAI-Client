@@ -29,14 +29,27 @@ class ProviderDefaults:
 
     # Gemini Pro (Paid API / Vertex / Google AI Studio)
     GEMINI_PRO_BASE_URL: Final[str] = "https://generativelanguage.googleapis.com/v1beta"
-    GEMINI_PRO_MODEL: Final[str] = "gemini-2.5-pro"
+    GEMINI_PRO_MODEL: Final[str] = "gemini-3.1-pro-preview"
     GEMINI_PRO_ENV_KEY: Final[str] = "GEMINI_PRO_API_KEY"
 
     # Gemini Free (Google AI Studio Free Tier)
     GEMINI_FREE_BASE_URL: Final[str] = (
         "https://generativelanguage.googleapis.com/v1beta"
     )
-    GEMINI_FREE_MODEL: Final[str] = "gemini-2.5-flash"
+    GEMINI_FREE_MODEL: Final[str] = "gemini-3.5-flash-lite"
+    GEMINI_FREE_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-flash-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+    )
     GEMINI_FREE_ENV_KEY: Final[str] = "GEMINI_FREE_API_KEY"
     GEMINI_FALLBACK_ENV_KEY: Final[str] = "GEMINI_API_KEY"
 
@@ -76,7 +89,16 @@ class ProviderDefaults:
     COHERE_ENV_KEY: Final[str] = "COHERE_API_KEY"
 
     # Default Vision Models for Multimodal Analysis
-    GEMINI_VISION_MODEL: Final[str] = "gemini-2.5-flash"
+    GEMINI_VISION_MODEL: Final[str] = "gemini-3.5-flash-lite"
+    GEMINI_FREE_VISION_FALLBACK_MODELS: Final[tuple[str, ...]] = (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+    )
     NVIDIA_VISION_MODEL: Final[str] = "meta/llama-3.2-11b-vision-instruct"
     MISTRAL_VISION_MODEL: Final[str] = "pixtral-12b-2409"
     COHERE_VISION_MODEL: Final[str] = "c4ai-aya-vision-32b"

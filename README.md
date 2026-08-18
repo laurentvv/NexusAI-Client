@@ -89,7 +89,7 @@ if __name__ == "__main__":
 | **Cerebras** | `"cerebras"` (or `"cerebras_free"`) | Free (CS-3) | OpenAI Chat API | `gpt-oss-120b` | Quotas: 30 RPM \| 60k TPM \| 1M tok/day |
 | **Cohere** | `"cohere"` (or `"cohere_free"`) | Free Trial | Cohere V2 REST | `command-r-plus-08-2024` | Quotas: 20 RPM \| 1,000 calls/month |
 | **DeepSeek** | `"deepseek"` | Paid | OpenAI Chat API | `deepseek-chat` | Real-time USD Balance (`GET /user/balance`) |
-| **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-2.5-flash` | Quotas: 15 RPM \| 1M TPM \| 1,500 RPD |
+| **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-3.5-flash-lite` | Auto-rotation 429 \| 15 RPM \| 500 RPD (Lite) / 20 RPD (Flash) |
 | **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-2.5-pro` | Google Cloud Pay-as-you-go Billing |
 | **Groq** | `"groq"` (or `"groq_free"`) | Free (LPU) | OpenAI Chat API | `llama-3.3-70b-versatile` | Quotas: 30 RPM \| 14,400 RPD \| 30k TPM |
 | **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
@@ -301,6 +301,41 @@ async def main():
                 print(f"🔧 Tool Requested: {call.name}")
                 print(f"📦 Arguments: {call.arguments}")
                 # Execute your local Python function and return result back to agent loop!
+
+### 8. Intelligent Gemini Free Model Rotation (Auto 429 Quota Failover)
+
+Google AI Studio Free tier enforces separate daily quotas per model (e.g. 500 RPD on Flash Lite, 20 RPD on Flash, 14.4k RPD on Gemma 4). `GeminiFreeProvider` automatically cascades across 11 free models when a rate limit (`HTTP 429`) is encountered:
+
+$$\text{gemini-3.5-flash-lite (500 RPD)} \longrightarrow \text{gemini-3.1-flash-lite (500 RPD)} \longrightarrow \text{gemini-3.7-flash} \longrightarrow \dots \longrightarrow \text{gemma-4-31b (14.4k RPD)}$$
+
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # If the default model (gemini-3.5-flash-lite) hits a 429 limit,
+    # it immediately retries with the next active model in sequence (gemini-3.1-flash-lite, etc.)
+    async with AIGateway("gemini_free") as client:
+        res = await client.generate_text("Explain quantum entanglement simply.")
+        print(f"✅ Generated via model [{res.model}]:\n{res.text}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### 9. 100% Free Multi-Provider Fallback (`auto_fallback_free`)
+
+Build zero-cost resilient workflows by cascading across all free providers present in your `.env`:
+
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # Cascade: Gemini Free (11 models) -> Groq LPU -> Cerebras CS-3 -> Nvidia NIM -> OrcaRouter -> Mistral -> Cohere -> OpenRouter
+    async with AIGateway.auto_fallback_free() as client:
+        res = await client.generate_text("Write a concise summary of AI agents architecture.")
+        print(f"✅ Served by [{res.provider} / {res.model}]:\n{res.text}")
 
 if __name__ == "__main__":
     asyncio.run(main())
