@@ -90,7 +90,7 @@ if __name__ == "__main__":
 | **Cohere** | `"cohere"` (or `"cohere_free"`) | Free Trial | Cohere V2 REST | `command-r-plus-08-2024` | Quotas: 20 RPM \| 1,000 calls/month |
 | **DeepSeek** | `"deepseek"` | Paid | OpenAI Chat API | `deepseek-chat` | Real-time USD Balance (`GET /user/balance`) |
 | **Gemini Free** | `"gemini_free"` | Free (AI Studio) | Gemini REST | `gemini-3.5-flash-lite` | Auto-rotation 429 \| 15 RPM \| 500 RPD (Lite) / 20 RPD (Flash) |
-| **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-2.5-pro` | Google Cloud Pay-as-you-go Billing |
+| **Gemini Pro** | `"gemini_pro"` | Paid | Gemini REST | `gemini-3.1-pro-preview` | Google Cloud Pay-as-you-go Billing |
 | **Groq** | `"groq"` (or `"groq_free"`) | Free (LPU) | OpenAI Chat API | `llama-3.3-70b-versatile` | Quotas: 30 RPM \| 14,400 RPD \| 30k TPM |
 | **Mistral AI** | `"mistral"` | Free / Platform | OpenAI Chat API | `mistral-small-latest` | Free Dev Models (`codestral-latest`, etc.) |
 | **Nvidia NIM** | `"nvidia_free"` | Free (NGC) | OpenAI Chat API | `meta/llama-3.1-8b-instruct` | 1,000 Free GPU Inference Credits (NGC) |
@@ -331,20 +331,128 @@ if __name__ == "__main__":
 
 ### 8. Intelligent Gemini Free Model Rotation (Auto 429 Quota Failover)
 
-Google AI Studio Free tier enforces separate daily quotas per model (e.g. 500 RPD on Flash Lite, 20 RPD on Flash, 14.4k RPD on Gemma 4). `GeminiFreeProvider` automatically cascades across 11 free models when a rate limit (`HTTP 429`) is encountered:
+Google AI Studio Free Tier offers world-class models (`gemini-3.5-flash-lite`, `gemini-3.7-flash`, etc.) with massive context windows (up to 1M tokens) at zero cost. However, Google enforces **strict per-model rate limits and daily quota pools**:
+- **Flash-Lite Models**: ~500 Requests/day (RPD), 15 RPM, 250k TPM
+- **Flash Models**: ~20 Requests/day (RPD), 15 RPM, 1M TPM
+- **Gemma Open Models**: ~14,400 Requests/day (RPD), 30 RPM, 30k TPM
 
-$$\text{gemini-3.5-flash-lite (500 RPD)} \longrightarrow \text{gemini-3.1-flash-lite (500 RPD)} \longrightarrow \text{gemini-3.7-flash} \longrightarrow \dots \longrightarrow \text{gemma-4-31b (14.4k RPD)}$$
+When a single model hits its quota limit (`HTTP 429 RESOURCE_EXHAUSTED`), traditional SDKs fail immediately. **NexusAI-Client solves this natively with a 2-Tier Fallback Hierarchy**:
 
+```
+ ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                   LEVEL 1: INTRA-PROVIDER SMART MODEL ROTATION                             │
+ │                                                                                                             │
+ │  1. gemini-3.5-flash-lite (500 RPD) ──► 2. gemini-3.1-flash-lite (500 RPD) ──► 3. gemini-flash-lite-latest   │
+ │                                                                                                             │
+ │       ▼ (If 429 Quota Exceeded)                                                                             │
+ │  4. gemini-3.7-flash (20 RPD)       ──► 5. gemini-3.6-flash (20 RPD)       ──► 6. gemini-3.5-flash (20 RPD)   │
+ │                                                                                                             │
+ │       ▼ (If 429 Quota Exceeded)                                                                             │
+ │  7. gemini-flash-latest             ──► 8. gemini-2.5-flash-lite (500 RPD) ──► 9. gemini-2.5-flash (20 RPD)   │
+ │                                                                                                             │
+ │       ▼ (If 429 Quota Exceeded)                                                                             │
+ │  10. gemma-4-31b-it (14.4k RPD)     ──► 11. gemma-4-26b-a4b-it (14.4k RPD)                                  │
+ └──────────────────────────────────────────────────────┬──────────────────────────────────────────────────────┘
+                                                        │ (Only if ALL 11 Gemini models exhausted)
+                                                        ▼
+ ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                               LEVEL 2: INTER-PROVIDER AUTO-FALLBACK FAILOVER                                │
+ │   Groq LPU ──► Cerebras CS-3 ──► Nvidia NIM ──► OrcaRouter ──► Mistral ──► Cohere ──► OpenRouter ──► DeepSeek│
+ └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 📋 Complete 11-Model Cascade Chain
+
+| Step | Model Identifier | Quotas (Free Tier) | Context Window | Primary Use Case |
+| :---: | :--- | :--- | :---: | :--- |
+| **1** | `gemini-3.5-flash-lite` *(Default)* | 500 RPD \| 15 RPM \| 250k TPM | 1,048,576 tokens | Ultra-fast default general queries & tool calling |
+| **2** | `gemini-3.1-flash-lite` | 500 RPD \| 15 RPM \| 250k TPM | 1,048,576 tokens | Fast secondary lightweight failover |
+| **3** | `gemini-flash-lite-latest` | 500 RPD \| 15 RPM \| 250k TPM | 1,048,576 tokens | Latest stable flash-lite pointer alias |
+| **4** | `gemini-3.7-flash` | 20 RPD \| 15 RPM \| 1,000,000 TPM | 1,048,576 tokens | High-reasoning & complex logic tasks |
+| **5** | `gemini-3.6-flash` | 20 RPD \| 15 RPM \| 1,000,000 TPM | 1,048,576 tokens | Advanced multimodal & code synthesis |
+| **6** | `gemini-3.5-flash` | 20 RPD \| 15 RPM \| 1,000,000 TPM | 1,048,576 tokens | General multimodal & vision failover |
+| **7** | `gemini-flash-latest` | 20 RPD \| 15 RPM \| 1,000,000 TPM | 1,048,576 tokens | Latest stable flash pointer alias |
+| **8** | `gemini-2.5-flash-lite` | 500 RPD \| 15 RPM \| 250k TPM | 1,048,576 tokens | Previous-generation fast fallback |
+| **9** | `gemini-2.5-flash` | 20 RPD \| 15 RPM \| 1,000,000 TPM | 1,048,576 tokens | Previous-generation robust fallback |
+| **10** | `gemma-4-31b-it` | 14,400 RPD \| 30 RPM \| 30k TPM | 131,072 tokens | High-volume open-weight model with massive RPD |
+| **11** | `gemma-4-26b-a4b-it` | 14,400 RPD \| 30 RPM \| 30k TPM | 131,072 tokens | Final emergency high-RPD free tier model |
+
+#### 👁️ Multimodal Vision Rotation Sequence
+For `analyze_image()`, the rotation automatically restricts itself to the 7 vision-capable Gemini models:
+`gemini-3.5-flash-lite` ➔ `gemini-3.1-flash-lite` ➔ `gemini-3.7-flash` ➔ `gemini-3.6-flash` ➔ `gemini-3.5-flash` ➔ `gemini-2.5-flash-lite` ➔ `gemini-2.5-flash`.
+
+#### ⏱️ Stateful Cooldown & Zero Latency Penalty
+- **Automatic Cooldowns**: When a model returns `HTTP 429`, it is immediately placed in cooldown (`cooldown_seconds=60.0` by default). Deprecated/404 models are cooled down for 1 hour.
+- **Zero Retrial Overhead**: Subsequent requests during the same process lifecycle instantly skip cooled-down models, routing directly to the first available operational model with **0ms penalty**.
+- **Real-Time Visibility**: Inspect live model statuses and cooldown timers with `get_account_info()`.
+
+#### 💻 Code Examples
+
+**1. Transparent Auto-Failover (Zero Configuration):**
 ```python
 import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    # If the default model (gemini-3.5-flash-lite) hits a 429 limit,
-    # it immediately retries with the next active model in sequence (gemini-3.1-flash-lite, etc.)
+    # If the primary model (gemini-3.5-flash-lite) hits a 429 limit,
+    # it immediately retries with gemini-3.1-flash-lite, gemini-3.7-flash, etc.
     async with AIGateway("gemini_free") as client:
         res = await client.generate_text("Explain quantum entanglement simply.")
-        print(f"✅ Generated via model [{res.model}]:\n{res.text}")
+        print(f"✅ Served by model [{res.model}] (Provider: {res.provider}):")
+        print(res.text)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**2. Live Rotation & Cooldown Diagnostics:**
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    async with AIGateway("gemini_free") as client:
+        info = await client.get_account_info()
+        print(f"Platform: {info.extra_details['platform']}")
+        print(f"Current Active Model: {info.extra_details['current_active_model']}")
+        print(f"Models in Cooldown: {info.extra_details['models_in_cooldown']}")
+        print(f"Quota Limits: {info.rate_limit_info}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**3. Customizing Fallback Sequence & Cooldowns:**
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # Define custom priority models and a 120s cooldown period
+    custom_models = ["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemma-4-31b-it"]
+    async with AIGateway(
+        "gemini_free",
+        fallback_models=custom_models,
+        cooldown_seconds=120.0,
+        auto_rotate_models=True,
+    ) as client:
+        res = await client.generate_text("Write an async Python pipeline.")
+        print(f"[{res.model}]: {res.text}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**4. Real-Time Token Streaming with Model Rotation:**
+```python
+import asyncio
+from nexusai_client import AIGateway
+
+async def main():
+    # Streaming seamlessly falls back to candidate models if 429 is encountered at stream start
+    async with AIGateway("gemini_free") as client:
+        async for chunk in client.stream_text("Explain distributed systems in 3 bullet points."):
+            print(chunk, end="", flush=True)
 
 if __name__ == "__main__":
     asyncio.run(main())

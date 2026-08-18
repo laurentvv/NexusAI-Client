@@ -433,8 +433,8 @@ except NexusAIError as e:
 
 | Identifier in `AIGateway("...")` | Provider | Tier | Default Model |
 | :--- | :--- | :--- | :--- |
-| `"gemini_free"` | Google AI Studio | Free | `gemini-2.5-flash` |
-| `"gemini_pro"` | Google AI Studio Pro | Paid | `gemini-2.5-pro` |
+| `"gemini_free"` | Google AI Studio | Free | `gemini-3.5-flash-lite` |
+| `"gemini_pro"` | Google AI Studio Pro | Paid | `gemini-3.1-pro-preview` |
 | `"groq"` (or `"groq_free"`) | Groq Cloud LPU | Free (30 RPM) | `llama-3.3-70b-versatile` |
 | `"nvidia_free"` (or `"nvidia"`) | Nvidia NIM | Free (1,000 credits) | `meta/llama-3.1-8b-instruct` |
 | `"openrouter"` | OpenRouter | Free (`:free`) & Paid | `openrouter/free` |
