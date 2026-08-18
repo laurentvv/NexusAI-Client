@@ -253,7 +253,7 @@ import asyncio
 from nexusai_client import AIGateway
 
 async def main():
-    # Automatically selects the best Vision model (Gemini 2.5 Flash, Llama 3.2 Vision, Aya Vision, Pixtral)
+    # Automatically selects the best Vision model (Gemini 2.5 Flash, Llama 3.2 Vision, Qwen 3.8 Vision, Aya Vision, Pixtral)
     async with AIGateway.auto_fallback_vision() as client:
         res = await client.analyze_image(
             prompt="Extract the invoice total and line items formatted as JSON.",

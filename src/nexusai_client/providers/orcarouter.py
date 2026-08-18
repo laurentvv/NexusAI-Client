@@ -36,6 +36,7 @@ class OrcaRouterProvider(OpenAICompatibleProvider):
         base_url: str | None = None,
         model: str | None = None,
         default_model: str | None = None,
+        vision_model: str | None = None,
         timeout: float | None = None,
         **kwargs: Any,
     ) -> None:
@@ -44,6 +45,7 @@ class OrcaRouterProvider(OpenAICompatibleProvider):
             api_key=api_key,
             base_url=base_url,
             model=model or default_model or ProviderDefaults.ORCAROUTER_MODEL,
+            vision_model=vision_model or ProviderDefaults.ORCAROUTER_VISION_MODEL,
             timeout=timeout,
         )
 

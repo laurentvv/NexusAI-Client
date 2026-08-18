@@ -470,6 +470,7 @@ class AIGateway:
         free_vision_candidates = [
             "gemini_free",
             "nvidia_free",
+            "orcarouter_free",
             "cohere_free",
             "mistral",
             "openrouter",
@@ -520,7 +521,7 @@ class AIGateway:
         if not chain:
             raise MissingAPIKeyError(
                 provider="Any Vision Provider",
-                env_var="GEMINI_FREE_API_KEY, NVIDIA_API_KEY, COHERE_API_KEY, MISTRAL_API_KEY, or OPENROUTER_API_KEY",
+                env_var="GEMINI_FREE_API_KEY, NVIDIA_API_KEY, ORCAROUTER_API_KEY, COHERE_API_KEY, MISTRAL_API_KEY, or OPENROUTER_API_KEY",
                 message="No configured multimodal Vision providers found in .env.",
             )
         return cls.with_fallback(chain, timeout=timeout, **kwargs)
