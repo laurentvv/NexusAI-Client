@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
 ### B. Resilient Automatic Multi-Provider Fallback
 
-If a free provider is rate-limited (HTTP 429) or unreachable, automatically failover to the next provider in the chain:
+If a free provider is rate-limited (HTTP 429) or unreachable, automatically failover to the next provider in the chain. Note that `gemini_free` also includes built-in **intra-provider auto-rotation across 11 free models** before failing over!
 
 ```python
 import asyncio
@@ -126,8 +126,14 @@ from nexusai_client import AIGateway, NexusAIError
 
 logger = logging.getLogger(__name__)
 
-# Fallback order: Gemini Free -> Groq LPU -> Nvidia NIM -> OpenRouter -> DeepSeek (Paid)
-PROVIDER_CHAIN = ["gemini_free", "groq", "nvidia_free", "openrouter", "deepseek"]
+# Option 1: 100% Free Zero-Cost Automatic Fallback (Gemini Free 11 models -> Groq -> Cerebras -> Nvidia -> OrcaRouter -> Mistral -> Cohere -> OpenRouter)
+async def ask_ai_zero_cost(prompt: str) -> tuple[str, str, str]:
+    async with AIGateway.auto_fallback_free(timeout=15.0) as client:
+        response = await client.generate_text(prompt=prompt)
+        return response.text, response.provider, response.model
+
+# Option 2: Custom Chain (Priority list: Free -> Paid Backup)
+PROVIDER_CHAIN = ["gemini_free", "groq", "cerebras", "nvidia_free", "openrouter", "deepseek"]
 
 async def ask_ai_with_fallback(prompt: str, system_prompt: str | None = None) -> tuple[str, str]:
     """Attempt generation across providers in priority order until success.
